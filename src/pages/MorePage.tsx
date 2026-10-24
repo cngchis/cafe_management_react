@@ -63,7 +63,7 @@ const groups: { title: string; layout: "tiles" | "list"; items: MoreItem[] }[] =
     layout: "tiles",
     items: [
       { label: "Phân tích", icon: "chart", path: "/reports/analysis", roles: ["owner", "manager"] },
-      { label: "Cuối ngày", icon: "calendar", path: "/reports/daily", roles: ["owner", "manager"] },
+      { label: "Cuối ngày", icon: "calendar", path: "/reports/daily", roles: ["owner", "manager", "cashier"] },
       { label: "Hàng hóa", icon: "box", path: "/reports/products", roles: ["owner", "manager"] },
       { label: "Bán hàng", icon: "chart", path: "/reports/sales", roles: ["owner", "manager"] },
     ],
