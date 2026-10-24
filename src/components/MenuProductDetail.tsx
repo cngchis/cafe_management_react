@@ -65,37 +65,80 @@ export function MenuProductDetail({ product, isNew = false, onBack, onSave, onDe
   }, [menuOpen, confirmDelete, isDeleting]);
 
   const update = (changes: Partial<MenuItem>) => setDraft((current) => ({ ...current, ...changes }));
+  
   const uploadImage = (file?: File) => {
     if (!file) return;
+
     if (!file.type.startsWith("image/")) {
       setSaveError("Chỉ hỗ trợ tệp hình ảnh.");
       return;
     }
+
     if (file.size > 10 * 1024 * 1024) {
       setSaveError("Ảnh phải nhỏ hơn 10 MB.");
       return;
     }
+
     setSaveError("");
+
     const reader = new FileReader();
+
     reader.onerror = () => setSaveError("Không đọc được tệp ảnh.");
+
     reader.onload = () => {
       const image = new Image();
+
       image.onerror = () => setSaveError("Tệp ảnh không hợp lệ.");
+
       image.onload = () => {
-        const scale = Math.min(1, 1200 / Math.max(image.width, image.height));
+        const scale = Math.min(
+          1,
+          800 / Math.max(image.width, image.height),
+        );
+
         const canvas = document.createElement("canvas");
         canvas.width = Math.max(1, Math.round(image.width * scale));
         canvas.height = Math.max(1, Math.round(image.height * scale));
-        canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
-        if (dataUrl.length > 1_800_000) {
-          setSaveError("Ảnh sau khi xử lý vẫn quá lớn. Hãy chọn ảnh khác.");
+
+        const context = canvas.getContext("2d");
+        if (!context) {
+          setSaveError("Không thể xử lý ảnh.");
           return;
         }
-        update({ image: dataUrl });
+
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              setSaveError("Không thể nén ảnh.");
+              return;
+            }
+
+            if (blob.size > 200 * 1024) {
+              setSaveError("Ảnh sau khi nén vẫn lớn hơn 200 KB.");
+              return;
+            }
+
+            const compressedReader = new FileReader();
+
+            compressedReader.onerror = () =>
+              setSaveError("Không đọc được ảnh sau khi nén.");
+
+            compressedReader.onload = () => {
+              update({ image: String(compressedReader.result) });
+            };
+
+            compressedReader.readAsDataURL(blob);
+          },
+          "image/webp",
+          0.6,
+        );
       };
+
       image.src = String(reader.result);
     };
+
     reader.readAsDataURL(file);
   };
   const save = async () => {
