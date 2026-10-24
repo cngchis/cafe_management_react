@@ -8,7 +8,6 @@ export const reportRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Querystring: { from: string; to: string } }>("/reports", async (request, reply) => {
     const account = await getSessionAccount(request);
     if (!account) return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lòng đăng nhập." } });
-    if (account.role === "cashier") return reply.code(403).send({ error: { code: "FORBIDDEN", message: "Bạn không có quyền xem báo cáo." } });
     const { from, to } = request.query;
     if (!datePattern.test(from) || !datePattern.test(to) || from > to || (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000 > 366) {
       return reply.code(400).send({ error: { code: "INVALID_REPORT_RANGE", message: "Khoảng ngày báo cáo không hợp lệ (tối đa 367 ngày)." } });
