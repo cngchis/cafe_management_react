@@ -45,7 +45,7 @@ const groups: { title: string; layout: "tiles" | "list"; items: MoreItem[] }[] =
     layout: "tiles",
     items: [
       { label: "Nhân viên", icon: "users", path: "/employees", roles: ["owner"] },
-      { label: "Lịch làm việc", icon: "clock", path: "/work-schedule", roles: ["owner"] },
+      { label: "Lịch làm việc", icon: "clock", path: "/work-schedule", roles: ["owner", "manager", "cashier"] },
       { label: "Bảng lương", icon: "calendar", path: "/payroll", roles: ["owner"] },
       { label: "Chấm công", icon: "clock", path: "/attendance", roles: ["owner", "manager", "cashier"] },
       { label: "phiếu giao ca", icon: "clock", path: "/shift-handovers", roles: ["owner", "manager", "cashier"] }
