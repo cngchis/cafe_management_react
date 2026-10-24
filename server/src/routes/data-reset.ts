@@ -1,16 +1,23 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
-import { sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { getSessionAccount } from "../auth/session.js";
 import {
   cashbookEntries,
+  attendanceRecords,
+  customers,
   inventoryCheckItems,
   inventoryChecks,
   inventoryMovements,
   orderItems,
   orders,
   payments,
+  priceListCustomers,
+  priceListItems,
+  priceLists,
   products,
+  purchaseReceiptItems,
+  purchaseReceipts,
+  shiftHandoverSheets,
   workShifts,
 } from "../db/schema.js";
 
@@ -50,9 +57,16 @@ export const dataResetRoutes: FastifyPluginAsync = async (app) => {
       await tx.delete(inventoryCheckItems);
       await tx.delete(inventoryChecks);
       await tx.delete(inventoryMovements);
-      await tx.execute(sql`DELETE FROM customers`);
+      await tx.delete(priceListItems);
+      await tx.delete(priceListCustomers);
+      await tx.delete(priceLists);
+      await tx.delete(purchaseReceiptItems);
+      await tx.delete(purchaseReceipts);
+      await tx.delete(attendanceRecords);
       await tx.delete(orders);
       await tx.delete(workShifts);
+      await tx.delete(shiftHandoverSheets);
+      await tx.delete(customers);
       await tx.delete(products);
     });
 

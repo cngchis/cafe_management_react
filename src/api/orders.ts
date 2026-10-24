@@ -2,9 +2,13 @@ export type CreateOrderInput = {
   items: Array<{ productId: string; quantity: number }>;
   orderType: "dine_in" | "takeaway" | "delivery";
   note?: string;
+  amountReceivedVnd?: number;
+  paymentMethod?: "cash" | "bank_transfer";
+  customerName?: string;
+  customerId?: string;
 };
 
-export type CreatedOrder = { id: string; orderNumber: string; totalVnd: number };
+export type CreatedOrder = { id: string; orderNumber: string; totalVnd: number; changeVnd?: number; creditVnd?: number };
 
 export type OrderRecord = {
   id: string;

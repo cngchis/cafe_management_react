@@ -10,8 +10,9 @@ async function readResponse<T>(response: Response): Promise<T> {
   return body as T;
 }
 
-export async function getProducts(): Promise<Product[]> {
-  const response = await fetch("/api/products");
+export async function getProducts(customerId?: string): Promise<Product[]> {
+  const query = customerId ? `?customerId=${encodeURIComponent(customerId)}` : "";
+  const response = await fetch(`/api/products${query}`);
   return (await readResponse<{ products: Product[] }>(response)).products;
 }
 

@@ -1,8 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { getSessionAccount } from "../auth/session.js";
-import { inventoryMovements, products } from "../db/schema.js";
+import { auditLogs, inventoryMovements, priceListCustomers, priceListItems, priceLists, products } from "../db/schema.js";
 
 const productProperties = {
   sku: { type: "string", minLength: 1, maxLength: 100 },
@@ -44,10 +44,21 @@ function publicProduct(product: {
 }
 
 export const productRoutes: FastifyPluginAsync = async (app) => {
-  app.get("/products", async (request, reply) => {
+  app.get<{ Querystring: { customerId?: string } }>("/products", async (request, reply) => {
     if (!(await getSessionAccount(request))) {
       return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lòng đăng nhập." } });
     }
+
+    const now = new Date();
+    const priceOverrides = request.query.customerId ? await db.select({
+      productId: priceListItems.productId, salePriceVnd: priceListItems.salePriceVnd,
+    }).from(priceListItems).innerJoin(priceLists, eq(priceLists.id, priceListItems.priceListId))
+      .leftJoin(priceListCustomers, eq(priceListCustomers.priceListId, priceLists.id))
+      .where(and(eq(priceLists.isActive, true), lte(priceLists.startsAt, now), or(isNull(priceLists.endsAt), gt(priceLists.endsAt, now)),
+        or(eq(priceLists.appliesToAllCustomers, true), eq(priceListCustomers.customerId, request.query.customerId))))
+      .orderBy(desc(sql`CASE WHEN ${priceLists.appliesToAllCustomers} THEN 0 ELSE 1 END`), desc(priceLists.startsAt), desc(priceLists.createdAt)) : [];
+    const priceByProduct = new Map<string, number>();
+    for (const override of priceOverrides) if (!priceByProduct.has(override.productId)) priceByProduct.set(override.productId, override.salePriceVnd);
 
     const rows = await db
       .select({
@@ -68,7 +79,7 @@ export const productRoutes: FastifyPluginAsync = async (app) => {
       .groupBy(products.id)
       .orderBy(products.name);
 
-    return { products: rows.map(publicProduct) };
+    return { products: rows.map((row) => publicProduct({ ...row, price: priceByProduct.get(row.id) ?? row.price })) };
   });
 
   app.post<{
@@ -120,6 +131,7 @@ export const productRoutes: FastifyPluginAsync = async (app) => {
             createdByName: account.displayName,
           });
         }
+        await tx.insert(auditLogs).values({ accountId: account.id, actorName: account.displayName, action: "created", entityType: "product", entityId: created.id, summary: `Thêm mặt hàng ${created.name}.` });
 
         return created;
       });
@@ -233,6 +245,7 @@ export const productRoutes: FastifyPluginAsync = async (app) => {
       .returning({ id: products.id });
 
     if (!deactivated) return reply.code(404).send({ error: { code: "PRODUCT_NOT_FOUND", message: "Không tìm thấy hàng hóa." } });
+    await db.insert(auditLogs).values({ accountId: account.id, actorName: account.displayName, action: "deactivated", entityType: "product", entityId: deactivated.id, summary: "Ẩn mặt hàng khỏi thực đơn." });
     return reply.code(204).send();
   });
 };

@@ -15,6 +15,12 @@ import { InventoryCheckPage } from "./pages/InventoryCheckPage";
 import { EmployeesPage } from "./pages/EmployeesPage";
 import { WorkSchedulePage } from "./pages/WorkSchedulePage";
 import { PayrollPage } from "./pages/PayrollPage";
+import { AttendancePage } from "./pages/AttendancePage";
+import { ShiftHandoverPage } from "./pages/ShiftHandoverPage";
+import { PriceListsPage } from "./pages/PriceListsPage";
+import { PurchasesPage } from "./pages/PurchasesPage";
+import { ReportsPage } from "./pages/ReportsPage";
+import { ActivityPage } from "./pages/ActivityPage";
 import { getCurrentAccount, type Account } from "./api/auth";
 import { canAccessPath, landingPath } from "./auth/permissions";
 
@@ -57,6 +63,12 @@ function AppShell({ account, onSignIn, onSignOut }: { account: Account | null; o
         <Route path="/employees" element={<EmployeesPage />} />
         <Route path="/work-schedule" element={<WorkSchedulePage />} />
         <Route path="/payroll" element={<PayrollPage />} />
+        <Route path="/attendance" element={<AttendancePage />} />
+        <Route path="/shift-handovers" element={<ShiftHandoverPage />} />
+        <Route path="/price-lists" element={<PriceListsPage />} />
+        <Route path="/purchases" element={<PurchasesPage />} />
+        <Route path="/reports/:kind" element={<ReportsPage />} />
+        <Route path="/activity" element={<ActivityPage />} />
         <Route path="/inventory-check" element={<InventoryCheckPage />} />
         <Route path="/invoices" element={<InvoicesPage role={account.role} />} />
         <Route path="/cashbook" element={<CashbookPage />} />

@@ -1,13 +1,13 @@
 import type { FastifyPluginAsync } from "fastify";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { getSessionAccount } from "../auth/session.js";
-import { cashAccounts, cashbookEntries, inventoryMovements, orderItems, orders, payments, products } from "../db/schema.js";
+import { auditLogs, cashAccounts, cashbookEntries, customers, inventoryMovements, orderItems, orders, payments, priceListCustomers, priceListItems, priceLists, products, shiftHandoverSheets } from "../db/schema.js";
 
 const bodySchema = {
   type: "object",
   additionalProperties: false,
-  required: ["items", "orderType"],
+    required: ["items", "orderType"],
   properties: {
     items: {
       type: "array",
@@ -25,6 +25,10 @@ const bodySchema = {
     },
     orderType: { type: "string", enum: ["dine_in", "takeaway", "delivery"] },
     note: { type: "string", maxLength: 2000 },
+    amountReceivedVnd: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+    paymentMethod: { type: "string", enum: ["cash", "bank_transfer"] },
+    customerName: { type: "string", maxLength: 200 },
+    customerId: { type: "string", format: "uuid" },
   },
 } as const;
 
@@ -32,6 +36,10 @@ type CreateOrderBody = {
   items: Array<{ productId: string; quantity: number }>;
   orderType: "dine_in" | "takeaway" | "delivery";
   note?: string;
+  amountReceivedVnd?: number;
+  paymentMethod?: "cash" | "bank_transfer";
+  customerName?: string;
+  customerId?: string;
 };
 
 export const orderRoutes: FastifyPluginAsync = async (app) => {
@@ -179,6 +187,7 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
       }
 
       await tx.update(orders).set({ status: "cancelled", updatedAt: now }).where(eq(orders.id, order.id));
+      await tx.insert(auditLogs).values({ accountId: account.id, actorName: account.displayName, action: "cancelled", entityType: "order", entityId: order.id, summary: `Hủy hóa đơn ${order.orderNumber}.` });
       return { id: order.id, status: "cancelled" as const };
     });
 
@@ -204,6 +213,9 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
     if ([...quantities.values()].some((quantity) => quantity > 1000)) {
       return reply.code(422).send({ error: { code: "QUANTITY_LIMIT", message: "Số lượng mỗi món tối đa là 1000." } });
     }
+    if (request.body.customerName !== undefined && !request.body.customerName.trim()) {
+      return reply.code(422).send({ error: { code: "INVALID_CUSTOMER_NAME", message: "Tên khách hàng không được để trống." } });
+    }
 
     const result = await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${idempotencyKey}, 0))`);
@@ -216,11 +228,24 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
         id: products.id,
         name: products.name,
         price: products.salePriceVnd,
+        cost: products.costPriceVnd,
         isActive: products.isActive,
       }).from(products).where(inArray(products.id, ids)).orderBy(products.id).for("update");
       if (lockedProducts.length !== ids.length || lockedProducts.some((product) => !product.isActive)) {
         throw Object.assign(new Error("Một hoặc nhiều món không còn khả dụng."), { statusCode: 409, code: "PRODUCT_UNAVAILABLE" });
       }
+      const [customer] = request.body.customerId ? await tx.select({ id: customers.id, name: customers.name })
+        .from(customers).where(and(eq(customers.id, request.body.customerId), eq(customers.isActive, true))).limit(1) : [];
+      if (request.body.customerId && !customer) throw Object.assign(new Error("Không tìm thấy khách hàng đang hoạt động."), { statusCode: 409, code: "CUSTOMER_UNAVAILABLE" });
+      const priceNow = new Date();
+      const overrides = request.body.customerId ? await tx.select({ productId: priceListItems.productId, price: priceListItems.salePriceVnd })
+        .from(priceListItems).innerJoin(priceLists, eq(priceLists.id, priceListItems.priceListId))
+        .leftJoin(priceListCustomers, eq(priceListCustomers.priceListId, priceLists.id))
+        .where(and(eq(priceLists.isActive, true), lte(priceLists.startsAt, priceNow), or(isNull(priceLists.endsAt), gt(priceLists.endsAt, priceNow)),
+          or(eq(priceLists.appliesToAllCustomers, true), eq(priceListCustomers.customerId, request.body.customerId))))
+        .orderBy(desc(priceLists.startsAt)) : [];
+      const effectivePrices = new Map<string, number>();
+      for (const item of overrides) if (!effectivePrices.has(item.productId)) effectivePrices.set(item.productId, item.price);
 
       const stockRows = await tx.select({
         productId: inventoryMovements.productId,
@@ -237,11 +262,12 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
       const lineItems = ids.map((productId) => {
         const product = byId.get(productId)!;
         const quantity = quantities.get(productId)!;
-        if (!Number.isSafeInteger(product.price) || !Number.isSafeInteger(product.price * quantity)) {
+        const effectivePrice = effectivePrices.get(productId) ?? product.price;
+        if (!Number.isSafeInteger(effectivePrice) || !Number.isSafeInteger(effectivePrice * quantity)) {
           throw Object.assign(new Error("Giá món vượt quá giới hạn hỗ trợ."), { statusCode: 422, code: "INVALID_PRODUCT_PRICE" });
         }
-        return { productId, productNameSnapshot: product.name, quantity, unitPriceVnd: product.price,
-          discountVnd: 0, lineTotalVnd: product.price * quantity };
+        return { productId, productNameSnapshot: product.name, quantity, unitPriceVnd: effectivePrice, unitCostVnd: product.cost,
+          discountVnd: 0, lineTotalVnd: effectivePrice * quantity };
       });
       const subtotal = lineItems.reduce((sum, item) => sum + BigInt(item.lineTotalVnd), 0n);
       const serviceFee = (subtotal * 5n + 50n) / 100n;
@@ -249,9 +275,26 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
       if (total <= 0n || total > BigInt(Number.MAX_SAFE_INTEGER)) {
         throw Object.assign(new Error("Tổng tiền đơn hàng không hợp lệ."), { statusCode: 422, code: "INVALID_ORDER_TOTAL" });
       }
+      const tendered = request.body.amountReceivedVnd ?? Number(total);
+      if (!Number.isSafeInteger(tendered) || tendered < 0) {
+        throw Object.assign(new Error("Số tiền khách trả không hợp lệ."), { statusCode: 422, code: "INVALID_TENDER" });
+      }
+      const paidAmount = Math.min(tendered, Number(total));
+      const creditAmount = Number(total) - paidAmount;
+      const paymentMethod = request.body.paymentMethod ?? "cash";
+      const selectedCustomerName = request.body.customerName?.trim() || customer?.name || "";
+      if (creditAmount > 0 && !selectedCustomerName) {
+        throw Object.assign(new Error("Cần nhập tên khách hàng khi đơn còn công nợ."), { statusCode: 422, code: "CUSTOMER_REQUIRED_FOR_CREDIT" });
+      }
+      const [openHandover] = await tx.select({ id: shiftHandoverSheets.id })
+        .from(shiftHandoverSheets).where(and(eq(shiftHandoverSheets.employeeId, account.id), sql`${shiftHandoverSheets.closedAt} IS NULL`)).limit(1);
       const orderNumber = `HD${Date.now()}${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
       const [created] = await tx.insert(orders).values({
         idempotencyKey,
+        customerId: customer?.id ?? null,
+        cashierAccountId: account.id,
+        shiftHandoverId: openHandover?.id ?? null,
+        customerNameSnapshot: selectedCustomerName || null,
         receiptCode: orderNumber,
         orderNumber,
         status: "completed",
@@ -264,27 +307,29 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
         serviceFeePercent: 5,
         serviceFeeVnd: Number(serviceFee),
         totalVnd: Number(total),
+        amountTenderedVnd: tendered,
+        changeVnd: Math.max(0, tendered - Number(total)),
         closedAt: new Date(),
       }).returning({ id: orders.id, orderNumber: orders.orderNumber, totalVnd: orders.totalVnd });
 
       await tx.insert(orderItems).values(lineItems.map((item) => ({ ...item, orderId: created.id })));
-      const [payment] = await tx.insert(payments).values({ orderId: created.id, amountVnd: Number(total), method: "cash", status: "completed" }).returning({ id: payments.id });
-      await tx.insert(cashAccounts).values({ name: "Tiền mặt", accountType: "cash" }).onConflictDoNothing();
-      const [cashAccount] = await tx.select({ id: cashAccounts.id }).from(cashAccounts)
-        .where(eq(cashAccounts.name, "Tiền mặt")).limit(1);
-      await tx.insert(cashbookEntries).values({
-        cashAccountId: cashAccount.id,
-        paymentId: payment.id,
-        referenceCode: `TH${orderNumber}`,
-        direction: "in",
-        title: "Thu tiền khách trả",
-        category: "Thu tiền bán hàng",
-        counterpartyGroup: "Khách hàng",
-        counterpartyName: "Khách hàng",
-        description: `Phiếu thu tự động cho hóa đơn ${orderNumber}`,
-        amountVnd: Number(total),
-        createdByName: account.displayName,
-      });
+      if (paidAmount > 0) {
+        const [payment] = await tx.insert(payments).values({ orderId: created.id, amountVnd: paidAmount, method: paymentMethod, status: "completed" }).returning({ id: payments.id });
+        const cashAccountName = paymentMethod === "cash" ? "Tiền mặt" : "Chuyển khoản";
+        await tx.insert(cashAccounts).values({ name: cashAccountName, accountType: paymentMethod === "cash" ? "cash" : "bank" }).onConflictDoNothing();
+        const [cashAccount] = await tx.select({ id: cashAccounts.id }).from(cashAccounts)
+          .where(eq(cashAccounts.name, cashAccountName)).limit(1);
+        await tx.insert(cashbookEntries).values({
+          cashAccountId: cashAccount.id, paymentId: payment.id, referenceCode: `TH${orderNumber}`,
+          direction: "in", title: "Thu tiền khách trả", category: "Thu tiền bán hàng",
+          counterpartyGroup: "Khách hàng", counterpartyName: selectedCustomerName || "Khách hàng",
+          description: `Phiếu thu tự động cho hóa đơn ${orderNumber}`, amountVnd: paidAmount,
+          createdByName: account.displayName,
+        });
+      }
+      if (creditAmount > 0) {
+        await tx.insert(payments).values({ orderId: created.id, amountVnd: creditAmount, method: "credit", status: "pending" });
+      }
       await tx.insert(inventoryMovements).values(lineItems.map((item) => ({
         productId: item.productId,
         quantityDelta: -item.quantity,
@@ -292,8 +337,9 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
         note: `Bán hàng ${orderNumber}`,
         createdByName: account.displayName,
       })));
+      await tx.insert(auditLogs).values({ accountId: account.id, actorName: account.displayName, action: "created", entityType: "order", entityId: created.id, summary: `Tạo hóa đơn ${created.orderNumber}.` });
 
-      return { ...created, paymentId: payment.id };
+      return { ...created, changeVnd: Math.max(0, tendered - Number(total)), creditVnd: creditAmount };
     });
 
     return reply.code(201).send({ order: result });

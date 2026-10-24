@@ -16,6 +16,13 @@ import { inventoryCheckRoutes } from "./routes/inventory-checks.js";
 import { employeeRoutes } from "./routes/employees.js";
 import { workforceRoutes } from "./routes/workforce.js";
 import { dataResetRoutes } from "./routes/data-reset.js";
+import { attendanceRoutes } from "./routes/attendance.js";
+import { shiftHandoverRoutes } from "./routes/shift-handovers.js";
+import { reportRoutes } from "./routes/reports.js";
+import { purchaseRoutes } from "./routes/purchases.js";
+import { priceListRoutes } from "./routes/price-lists.js";
+import { activityRoutes } from "./routes/activity.js";
+import { customerRoutes } from "./routes/customers.js";
 import { getSessionAccount } from "./auth/session.js";
 import { readFile } from "node:fs/promises";
 import { extname, join, resolve, sep } from "node:path";
@@ -139,6 +146,13 @@ export async function createApp() {
   await app.register(employeeRoutes, { prefix: "/api" });
   await app.register(workforceRoutes, { prefix: "/api" });
   await app.register(dataResetRoutes, { prefix: "/api" });
+  await app.register(attendanceRoutes, { prefix: "/api" });
+  await app.register(shiftHandoverRoutes, { prefix: "/api" });
+  await app.register(reportRoutes, { prefix: "/api" });
+  await app.register(purchaseRoutes, { prefix: "/api" });
+  await app.register(priceListRoutes, { prefix: "/api" });
+  await app.register(activityRoutes, { prefix: "/api" });
+  await app.register(customerRoutes, { prefix: "/api" });
 
   const staticRoot = resolve(process.cwd(), "dist");
   const contentTypes: Record<string, string> = {

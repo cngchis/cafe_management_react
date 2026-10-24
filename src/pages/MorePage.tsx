@@ -6,6 +6,7 @@ type MoreItem = {
   label: string;
   icon: IconName;
   path: string;
+  href?: string;
   roles: Account["role"][];
 };
 
@@ -15,7 +16,7 @@ const groups: { title: string; layout: "tiles" | "list"; items: MoreItem[] }[] =
     layout: "tiles",
     items: [
       { label: "Món", icon: "coffee", path: "/menu", roles: ["owner", "manager"] },
-      { label: "Thiết lập giá", icon: "settings", path: "/", roles: ["owner", "manager"] }
+      { label: "Thiết lập giá", icon: "settings", path: "/price-lists", roles: ["owner", "manager"] }
     ],
   },
   {
@@ -31,7 +32,7 @@ const groups: { title: string; layout: "tiles" | "list"; items: MoreItem[] }[] =
     items: [
       { label: "Kho hàng", icon: "check", path: "/inventory", roles: ["owner", "manager"] },
       { label: "Kiểm kho", icon: "check", path: "/inventory-check", roles: ["owner", "manager"] },
-      { label: "Nhập hàng", icon: "plus", path: "/", roles: ["owner", "manager"] }
+      { label: "Nhập hàng", icon: "plus", path: "/purchases", roles: ["owner", "manager"] }
     ],
   },
   {
@@ -46,8 +47,8 @@ const groups: { title: string; layout: "tiles" | "list"; items: MoreItem[] }[] =
       { label: "Nhân viên", icon: "users", path: "/employees", roles: ["owner"] },
       { label: "Lịch làm việc", icon: "clock", path: "/work-schedule", roles: ["owner"] },
       { label: "Bảng lương", icon: "calendar", path: "/payroll", roles: ["owner"] },
-      { label: "Chấm công", icon: "clock", path: "/", roles: ["owner"] },
-      { label: "phiếu giao ca", icon: "clock", path: "/", roles: ["owner", "manager"] }
+      { label: "Chấm công", icon: "clock", path: "/attendance", roles: ["owner", "manager", "cashier"] },
+      { label: "phiếu giao ca", icon: "clock", path: "/shift-handovers", roles: ["owner", "manager", "cashier"] }
     ],
   },
   {
@@ -61,10 +62,10 @@ const groups: { title: string; layout: "tiles" | "list"; items: MoreItem[] }[] =
     title: "Báo cáo",
     layout: "tiles",
     items: [
-      { label: "Phân tích", icon: "chart", path: "/", roles: ["owner", "manager"] },
-      { label: "Cuối ngày", icon: "calendar", path: "/", roles: ["owner", "manager"] },
-      { label: "Hàng hóa", icon: "box", path: "/", roles: ["owner", "manager"] },
-      { label: "Bán hàng", icon: "chart", path: "/", roles: ["owner", "manager"] },
+      { label: "Phân tích", icon: "chart", path: "/reports/analysis", roles: ["owner", "manager"] },
+      { label: "Cuối ngày", icon: "calendar", path: "/reports/daily", roles: ["owner", "manager"] },
+      { label: "Hàng hóa", icon: "box", path: "/reports/products", roles: ["owner", "manager"] },
+      { label: "Bán hàng", icon: "chart", path: "/reports/sales", roles: ["owner", "manager"] },
     ],
   },
   {
@@ -72,8 +73,8 @@ const groups: { title: string; layout: "tiles" | "list"; items: MoreItem[] }[] =
     layout: "list",
     items: [
       { label: "Thiết lập cửa hàng", icon: "settings", path: "/settings", roles: ["owner", "manager"] },
-      { label: "Lịch sử thao tác", icon: "history", path: "/", roles: ["owner", "manager"] },
-      { label: "Chat với hỗ trợ", icon: "help", path: "/", roles: ["owner", "manager", "cashier"] },
+      { label: "Lịch sử thao tác", icon: "history", path: "/activity", roles: ["owner", "manager"] },
+      { label: "Chat với hỗ trợ", icon: "help", path: "", href: "https://m.me/cngchis", roles: ["owner", "manager", "cashier"] },
     ],
   },
 ];
@@ -120,7 +121,11 @@ export function MorePage({ navigate, onSignOut, account }: { navigate: (path: st
         return <section className="more-group-card" key={group.title}>
           <h3>{group.title}</h3>
           <div className={group.layout === "tiles" ? "more-items-grid" : "more-items-list"}>
-            {visibleItems.map((item) => <button className="more-item" key={item.path} onClick={() => navigate(item.path)}>
+            {visibleItems.map((item) => item.href ? <a className="more-item" key={item.label} href={item.href} target="_blank" rel="noopener noreferrer">
+              <span className="more-item-icon"><Icon name={item.icon} size={26} /></span>
+              <span className="more-item-label">{item.label}</span>
+              {group.layout === "list" && <Icon name="chevron" size={20} />}
+            </a> : <button className="more-item" key={item.path} onClick={() => navigate(item.path)}>
               <span className="more-item-icon"><Icon name={item.icon} size={26} /></span>
               <span className="more-item-label">{item.label}</span>
               {group.layout === "list" && <Icon name="chevron" size={20} />}

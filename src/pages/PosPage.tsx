@@ -5,6 +5,7 @@ import { CartPanel } from "../components/CartPanel";
 import { formatMoney, type Product } from "../data/products";
 import { getProducts } from "../api/products";
 import { createOrder } from "../api/orders";
+import { getPriceListTargets, type CustomerTarget } from "../api/moreOperations";
 
 type Cart = Record<string, number>;
 
@@ -14,6 +15,8 @@ export function PosPage() {
   const [cart, setCart] = useState<Cart>({});
   const [cartOpen, setCartOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
+  const [customers, setCustomers] = useState<CustomerTarget[]>([]);
+  const [customerId, setCustomerId] = useState("");
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState("");
   const categories = ["Tất cả", "Cà phê", "Trà", "Đá xay", "Bánh ngọt"];
@@ -26,11 +29,12 @@ export function PosPage() {
     if (!next) delete updated[id];
     return updated;
   });
-  const completeOrder = async (orderType: "dine_in" | "takeaway" | "delivery", note: string, idempotencyKey: string) => {
+  const completeOrder = async (orderType: "dine_in" | "takeaway" | "delivery", note: string, idempotencyKey: string, payment: { amountReceivedVnd: number; paymentMethod: "cash" | "bank_transfer"; customerName: string; customerId?: string }) => {
     const order = await createOrder({
       items: cartItems.map(({ id, quantity }) => ({ productId: id, quantity })),
       orderType,
       note,
+      ...payment,
     }, idempotencyKey);
     setCart({});
     void getProducts().then(setProducts).catch(() => undefined);
@@ -38,11 +42,16 @@ export function PosPage() {
   };
 
   useEffect(() => {
-    getProducts()
+    getPriceListTargets().then(({ customers: rows }) => setCustomers(rows)).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    setCatalogLoading(true);
+    getProducts(customerId || undefined)
       .then(setProducts)
       .catch((error) => setCatalogError(error instanceof Error ? error.message : "Không tải được thực đơn."))
       .finally(() => setCatalogLoading(false));
-  }, []);
+  }, [customerId]);
 
   useEffect(() => {
     if (!cartOpen) return;
@@ -71,7 +80,7 @@ export function PosPage() {
     </section>
     {createPortal(<>
       <button className="cart-toggle" aria-label={`Giỏ hàng, ${cartCount} món`} aria-controls="cart-panel" aria-expanded={cartOpen} onClick={() => setCartOpen(true)}><Icon name="cart" size={22} /><b className="cart-count">{cartCount}</b></button>
-      {cartOpen && <div className="cart-overlay"><button className="cart-backdrop" type="button" aria-label="Đóng giỏ hàng" onClick={() => setCartOpen(false)} /><CartPanel items={cartItems} onUpdateCart={updateCart} onClearCart={() => setCart({})} onClose={() => setCartOpen(false)} onComplete={completeOrder} /></div>}
+      {cartOpen && <div className="cart-overlay"><button className="cart-backdrop" type="button" aria-label="Đóng giỏ hàng" onClick={() => setCartOpen(false)} /><CartPanel items={cartItems} customers={customers} customerId={customerId} onCustomerChange={setCustomerId} onUpdateCart={updateCart} onClearCart={() => setCart({})} onClose={() => setCartOpen(false)} onComplete={completeOrder} /></div>}
     </>, document.body)}
   </div>;
 }
