@@ -15,6 +15,7 @@ import { cashbookRoutes } from "./routes/cashbook.js";
 import { inventoryCheckRoutes } from "./routes/inventory-checks.js";
 import { employeeRoutes } from "./routes/employees.js";
 import { workforceRoutes } from "./routes/workforce.js";
+import { dataResetRoutes } from "./routes/data-reset.js";
 import { getSessionAccount } from "./auth/session.js";
 import { readFile } from "node:fs/promises";
 import { extname, join, resolve, sep } from "node:path";
@@ -137,6 +138,7 @@ export async function createApp() {
   await app.register(inventoryCheckRoutes, { prefix: "/api" });
   await app.register(employeeRoutes, { prefix: "/api" });
   await app.register(workforceRoutes, { prefix: "/api" });
+  await app.register(dataResetRoutes, { prefix: "/api" });
 
   const staticRoot = resolve(process.cwd(), "dist");
   const contentTypes: Record<string, string> = {
