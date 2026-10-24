@@ -24,6 +24,7 @@ export type IconName =
   | "store"
   | "menu"
   | "close"
+  | "logout"
   | "filter";
 
 const iconPaths: Record<IconName, React.ReactNode> = {
@@ -52,6 +53,7 @@ const iconPaths: Record<IconName, React.ReactNode> = {
   store: <><path d="M3 10h18M5 10v10h14V10M4 4h16l1 6H3l1-6Z" /><path d="M9 20v-6h6v6" /></>,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   close: <path d="m6 6 12 12M18 6 6 18" />,
+  logout: <><path d="M10 17l5-5-5-5M15 12H3" /><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" /></>,
   filter: <path d="M4 5h16M7 12h10M10 19h4" />,
 };
 

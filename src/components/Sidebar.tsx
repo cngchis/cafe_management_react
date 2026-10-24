@@ -4,10 +4,9 @@ import type { Account } from "../api/auth";
 
 const navigation = [
   { label: "Tổng quan", icon: "chart" as IconName, path: "/" },
-  { label: "Bán hàng", icon: "cart" as IconName, path: "/pos" },
   { label: "Món", icon: "coffee" as IconName, path: "/menu" },
+  { label: "Bán hàng", icon: "cart" as IconName, path: "/pos" },
   { label: "Hóa đơn", icon: "receipt" as IconName, path: "/invoices" },
-  { label: "Sổ quỹ", icon: "wallet" as IconName, path: "/cashbook" },
   { label: "Nhiều hơn", icon: "menu" as IconName, path: "/more" }
 ];
 
@@ -23,7 +22,7 @@ export function Sidebar({ account, activePath, navigate }: { account: Account; a
     <div className="sidebar-top"><Brand /></div>
     <nav className="nav-list" aria-label="Điều hướng chính">
       {navigation.filter((item) => canAccessPath(role, item.path)).map((item) => <button key={item.path} className={`nav-item ${item.path === "/" ? "overview-nav" : ""} ${activePath === item.path ? "active" : ""}`} onClick={() => navigate(item.path)}>
-        <Icon name={item.icon} /><span>{item.label}</span>{item.badge && <b>{item.badge}</b>}
+        <Icon name={item.icon} /><span>{item.label}</span>
       </button>)}
     </nav>
     <div className="sidebar-bottom">
