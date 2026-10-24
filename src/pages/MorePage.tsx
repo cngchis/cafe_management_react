@@ -13,20 +13,26 @@ const groups: { title: string; layout: "tiles" | "list"; items: MoreItem[] }[] =
   {
     title: "Thực đơn",
     layout: "tiles",
-    items: [{ label: "Món", icon: "coffee", path: "/menu", roles: ["owner", "manager"] }],
+    items: [
+      { label: "Món", icon: "coffee", path: "/menu", roles: ["owner", "manager"] },
+      { label: "Thiết lập giá", icon: "settings", path: "/", roles: ["owner", "manager"] }
+    ],
   },
   {
     title: "Hóa đơn",
     layout: "tiles",
     items: [
       { label: "Hóa đơn", icon: "receipt", path: "/invoices", roles: ["owner", "manager", "cashier"] },
-      { label: "Sổ quỹ", icon: "wallet", path: "/cashbook", roles: ["owner", "manager"] },
     ],
   },
   {
     title: "Kho hàng",
     layout: "tiles",
-    items: [{ label: "Kiểm kho", icon: "check", path: "/inventory-check", roles: ["owner", "manager"] }],
+    items: [
+      { label: "Kho hàng", icon: "check", path: "/inventory", roles: ["owner", "manager"] },
+      { label: "Kiểm kho", icon: "check", path: "/inventory-check", roles: ["owner", "manager"] },
+      { label: "Nhập hàng", icon: "plus", path: "/", roles: ["owner", "manager"] }
+    ],
   },
   {
     title: "Khách hàng",
@@ -40,12 +46,35 @@ const groups: { title: string; layout: "tiles" | "list"; items: MoreItem[] }[] =
       { label: "Nhân viên", icon: "users", path: "/employees", roles: ["owner"] },
       { label: "Lịch làm việc", icon: "clock", path: "/work-schedule", roles: ["owner"] },
       { label: "Bảng lương", icon: "calendar", path: "/payroll", roles: ["owner"] },
+      { label: "Chấm công", icon: "clock", path: "/", roles: ["owner"] },
+      { label: "phiếu giao ca", icon: "clock", path: "/", roles: ["owner", "manager"] }
+    ],
+  },
+  {
+    title: "Sổ thu chi",
+    layout: "tiles",
+    items: [
+      { label: "Sổ quỹ", icon: "wallet", path: "/cashbook", roles: ["owner", "manager"] },
+    ],
+  },
+  {
+    title: "Báo cáo",
+    layout: "tiles",
+    items: [
+      { label: "Phân tích", icon: "chart", path: "/", roles: ["owner", "manager"] },
+      { label: "Cuối ngày", icon: "calendar", path: "/", roles: ["owner", "manager"] },
+      { label: "Hàng hóa", icon: "box", path: "/", roles: ["owner", "manager"] },
+      { label: "Bán hàng", icon: "chart", path: "/", roles: ["owner", "manager"] },
     ],
   },
   {
     title: "Cài đặt chung",
     layout: "list",
-    items: [{ label: "Thiết lập cửa hàng", icon: "settings", path: "/settings", roles: ["owner", "manager"] }],
+    items: [
+      { label: "Thiết lập cửa hàng", icon: "settings", path: "/settings", roles: ["owner", "manager"] },
+      { label: "Lịch sử thao tác", icon: "history", path: "/", roles: ["owner", "manager"] },
+      { label: "Chat với hỗ trợ", icon: "help", path: "/", roles: ["owner", "manager", "cashier"] },
+    ],
   },
 ];
 
