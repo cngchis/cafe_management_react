@@ -83,18 +83,20 @@ export function MenuPage() {
 
   return <>
     <div className="menu-page page-enter">
-      <header className="menu-page-heading">
-        <h1>Món</h1>
-        <div className="menu-page-actions">
-          <button className="menu-header-action" aria-label="Tìm món" onClick={() => setSearchOpen((current) => !current)}><Icon name="search" size={24} /></button>
-          <button className="menu-header-action" aria-label="Đổi cách sắp xếp" onClick={() => setSort((current) => current === "price-asc" ? "name" : current === "name" ? "stock" : "price-asc")}><Icon name="sort" size={24} /></button>
-          <button className="menu-header-action" aria-label="Trợ giúp" onClick={() => setHelpOpen((current) => !current)}><Icon name="help" size={23} /></button>
-        </div>
-      </header>
-      {searchOpen && <label className="menu-search"><Icon name="search" size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm món..." /><button type="button" aria-label="Đóng tìm kiếm" onClick={() => { setSearchOpen(false); setQuery(""); }}><Icon name="close" size={17} /></button></label>}
-      {helpOpen && <div className="menu-help" role="status">Chọn món để xem chi tiết, giá bán và tồn kho.</div>}
-      {error && <p role="alert" className="menu-help">{error}</p>}
-      <div className="menu-category-tabs" role="tablist" aria-label="Danh mục món">{categories.map((item) => <button role="tab" aria-selected={category === item} className={category === item ? "active" : ""} key={item} onClick={() => setCategory(item)}>{item}</button>)}</div>
+      <div className="catalog-sticky">
+        <header className="menu-page-heading">
+          <h1>Món</h1>
+          <div className="menu-page-actions">
+            <button className="menu-header-action" aria-label="Tìm món" onClick={() => setSearchOpen((current) => !current)}><Icon name="search" size={24} /></button>
+            <button className="menu-header-action" aria-label="Đổi cách sắp xếp" onClick={() => setSort((current) => current === "price-asc" ? "name" : current === "name" ? "stock" : "price-asc")}><Icon name="sort" size={24} /></button>
+            <button className="menu-header-action" aria-label="Trợ giúp" onClick={() => setHelpOpen((current) => !current)}><Icon name="help" size={23} /></button>
+          </div>
+        </header>
+        {searchOpen && <label className="menu-search"><Icon name="search" size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm món..." /><button type="button" aria-label="Đóng tìm kiếm" onClick={() => { setSearchOpen(false); setQuery(""); }}><Icon name="close" size={17} /></button></label>}
+        {helpOpen && <div className="menu-help" role="status">Chọn món để xem chi tiết, giá bán và tồn kho.</div>}
+        {error && <p role="alert" className="menu-help">{error}</p>}
+        <div className="menu-category-tabs" role="tablist" aria-label="Danh mục món">{categories.map((item) => <button role="tab" aria-selected={category === item} className={category === item ? "active" : ""} key={item} onClick={() => setCategory(item)}>{item}</button>)}</div>
+      </div>
       <section className="menu-list-panel">
         <div className="menu-list-toolbar"><strong>{isLoading ? "Đang tải thực đơn..." : `${visibleItems.length} món · SL tồn ${totalStock}`}</strong><label><select value={sort} onChange={(event) => setSort(event.target.value)} aria-label="Sắp xếp món"><option value="price-asc">Giá bán</option><option value="name">Tên món</option><option value="stock">Tồn kho</option></select><Icon name="chevron" size={16} /></label></div>
         <div className="menu-product-list">
