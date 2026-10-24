@@ -22,7 +22,6 @@ export const customerRoutes: FastifyPluginAsync = async (app) => {
   }, async (request, reply) => {
     const account = await getSessionAccount(request);
     if (!account) return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lòng đăng nhập." } });
-    if (account.role === "cashier") return reply.code(403).send({ error: { code: "FORBIDDEN", message: "Bạn không có quyền tạo khách hàng." } });
     const name = request.body.name.trim();
     const phone = request.body.phone?.trim() || null;
     if (!name) return reply.code(400).send({ error: { code: "INVALID_CUSTOMER", message: "Tên khách hàng không được để trống." } });

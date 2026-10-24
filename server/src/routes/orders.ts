@@ -29,6 +29,7 @@ const bodySchema = {
     paymentMethod: { type: "string", enum: ["cash", "bank_transfer"] },
     customerName: { type: "string", maxLength: 200 },
     customerId: { type: "string", format: "uuid" },
+    discountVnd: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
   },
 } as const;
 
@@ -40,6 +41,7 @@ type CreateOrderBody = {
   paymentMethod?: "cash" | "bank_transfer";
   customerName?: string;
   customerId?: string;
+  discountVnd?: number;
 };
 
 export const orderRoutes: FastifyPluginAsync = async (app) => {
@@ -213,10 +215,6 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
     if ([...quantities.values()].some((quantity) => quantity > 1000)) {
       return reply.code(422).send({ error: { code: "QUANTITY_LIMIT", message: "Số lượng mỗi món tối đa là 1000." } });
     }
-    if (request.body.customerName !== undefined && !request.body.customerName.trim()) {
-      return reply.code(422).send({ error: { code: "INVALID_CUSTOMER_NAME", message: "Tên khách hàng không được để trống." } });
-    }
-
     const result = await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${idempotencyKey}, 0))`);
       const [existingOrder] = await tx.select({ id: orders.id, orderNumber: orders.orderNumber, totalVnd: orders.totalVnd })
@@ -270,9 +268,23 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
           discountVnd: 0, lineTotalVnd: effectivePrice * quantity };
       });
       const subtotal = lineItems.reduce((sum, item) => sum + BigInt(item.lineTotalVnd), 0n);
-      const serviceFee = (subtotal * 5n + 50n) / 100n;
-      const total = subtotal + serviceFee;
-      if (total <= 0n || total > BigInt(Number.MAX_SAFE_INTEGER)) {
+      if (subtotal > BigInt(Number.MAX_SAFE_INTEGER)) {
+        throw Object.assign(new Error("Tổng tiền hàng vượt giới hạn hỗ trợ."), { statusCode: 422, code: "INVALID_ORDER_TOTAL" });
+      }
+      const discount = BigInt(request.body.discountVnd ?? 0);
+      if (discount > subtotal) {
+        throw Object.assign(new Error("Tiền giảm giá không được vượt quá tạm tính."), { statusCode: 422, code: "INVALID_DISCOUNT" });
+      }
+      let discountRemaining = discount;
+      const discountedLineItems = lineItems.map((item, index) => {
+        const gross = BigInt(item.lineTotalVnd);
+        const allocated = index === lineItems.length - 1 ? discountRemaining : subtotal > 0n ? discount * gross / subtotal : 0n;
+        discountRemaining -= allocated;
+        return { ...item, discountVnd: Number(allocated), lineTotalVnd: Number(gross - allocated) };
+      });
+      const serviceFee = 0n;
+      const total = subtotal - discount;
+      if (total < 0n || total > BigInt(Number.MAX_SAFE_INTEGER)) {
         throw Object.assign(new Error("Tổng tiền đơn hàng không hợp lệ."), { statusCode: 422, code: "INVALID_ORDER_TOTAL" });
       }
       const tendered = request.body.amountReceivedVnd ?? Number(total);
@@ -283,9 +295,6 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
       const creditAmount = Number(total) - paidAmount;
       const paymentMethod = request.body.paymentMethod ?? "cash";
       const selectedCustomerName = request.body.customerName?.trim() || customer?.name || "";
-      if (creditAmount > 0 && !selectedCustomerName) {
-        throw Object.assign(new Error("Cần nhập tên khách hàng khi đơn còn công nợ."), { statusCode: 422, code: "CUSTOMER_REQUIRED_FOR_CREDIT" });
-      }
       const [openHandover] = await tx.select({ id: shiftHandoverSheets.id })
         .from(shiftHandoverSheets).where(and(eq(shiftHandoverSheets.employeeId, account.id), sql`${shiftHandoverSheets.closedAt} IS NULL`)).limit(1);
       const orderNumber = `HD${Date.now()}${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
@@ -303,8 +312,8 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
         cashierName: account.displayName,
         orderNote: request.body.note?.trim() || null,
         subtotalVnd: Number(subtotal),
-        discountVnd: 0,
-        serviceFeePercent: 5,
+        discountVnd: Number(discount),
+        serviceFeePercent: 0,
         serviceFeeVnd: Number(serviceFee),
         totalVnd: Number(total),
         amountTenderedVnd: tendered,
@@ -312,7 +321,7 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
         closedAt: new Date(),
       }).returning({ id: orders.id, orderNumber: orders.orderNumber, totalVnd: orders.totalVnd });
 
-      await tx.insert(orderItems).values(lineItems.map((item) => ({ ...item, orderId: created.id })));
+      await tx.insert(orderItems).values(discountedLineItems.map((item) => ({ ...item, orderId: created.id })));
       if (paidAmount > 0) {
         const [payment] = await tx.insert(payments).values({ orderId: created.id, amountVnd: paidAmount, method: paymentMethod, status: "completed" }).returning({ id: payments.id });
         const cashAccountName = paymentMethod === "cash" ? "Tiền mặt" : "Chuyển khoản";

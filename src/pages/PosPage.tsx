@@ -6,6 +6,7 @@ import { formatMoney, type Product } from "../data/products";
 import { getProducts } from "../api/products";
 import { createOrder } from "../api/orders";
 import { getPriceListTargets, type CustomerTarget } from "../api/moreOperations";
+import { createCustomer } from "../api/customers";
 
 type Cart = Record<string, number>;
 
@@ -29,7 +30,7 @@ export function PosPage() {
     if (!next) delete updated[id];
     return updated;
   });
-  const completeOrder = async (orderType: "dine_in" | "takeaway" | "delivery", note: string, idempotencyKey: string, payment: { amountReceivedVnd: number; paymentMethod: "cash" | "bank_transfer"; customerName: string; customerId?: string }) => {
+  const completeOrder = async (orderType: "dine_in" | "takeaway" | "delivery", note: string, idempotencyKey: string, payment: { amountReceivedVnd: number; paymentMethod: "cash" | "bank_transfer"; customerName: string; customerId?: string; discountVnd: number }) => {
     const order = await createOrder({
       items: cartItems.map(({ id, quantity }) => ({ productId: id, quantity })),
       orderType,
@@ -80,7 +81,7 @@ export function PosPage() {
     </section>
     {createPortal(<>
       <button className="cart-toggle" aria-label={`Giỏ hàng, ${cartCount} món`} aria-controls="cart-panel" aria-expanded={cartOpen} onClick={() => setCartOpen(true)}><Icon name="cart" size={22} /><b className="cart-count">{cartCount}</b></button>
-      {cartOpen && <div className="cart-overlay"><button className="cart-backdrop" type="button" aria-label="Đóng giỏ hàng" onClick={() => setCartOpen(false)} /><CartPanel items={cartItems} customers={customers} customerId={customerId} onCustomerChange={setCustomerId} onUpdateCart={updateCart} onClearCart={() => setCart({})} onClose={() => setCartOpen(false)} onComplete={completeOrder} /></div>}
+      {cartOpen && <div className="cart-overlay"><button className="cart-backdrop" type="button" aria-label="Đóng giỏ hàng" onClick={() => setCartOpen(false)} /><CartPanel items={cartItems} customers={customers} customerId={customerId} onCustomerChange={setCustomerId} onCustomerCreated={(customer) => setCustomers((current) => [...current, customer].sort((a, b) => a.name.localeCompare(b.name, "vi")))} onUpdateCart={updateCart} onClearCart={() => setCart({})} onClose={() => setCartOpen(false)} onComplete={completeOrder} /></div>}
     </>, document.body)}
   </div>;
 }

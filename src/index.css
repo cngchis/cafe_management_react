@@ -4083,7 +4083,13 @@ td strong {
   padding: 0 20px 12px;
 }
 
-.pos-customer-selector > span,
+.pos-customer-selector > label,
+.pos-create-customer .setting-field {
+  display: grid;
+  gap: 7px;
+}
+
+.pos-customer-selector > label > span,
 .payment-tender .setting-field > span {
   color: var(--ink-faint);
   font-size: 10px;
@@ -4117,6 +4123,197 @@ td strong {
 }
 
 .payment-credit-note { color: #b42318; }
+
+.pos-create-customer {
+  display: grid;
+  gap: 9px;
+  padding: 0 20px 12px;
+}
+
+.pos-create-customer .primary-button {
+  justify-self: start;
+}
+
+.cart-quick-actions {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  padding: 2px 16px 12px;
+}
+
+.cart-quick-actions button {
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 5px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  background: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.cart-quick-actions button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cart-sheet-layer,
+.discount-modal-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(15, 23, 19, .42);
+}
+
+.cart-bottom-sheet {
+  width: 100%;
+  max-height: 78%;
+  overflow: auto;
+  padding: 18px 20px max(20px, env(safe-area-inset-bottom));
+  border-radius: 18px 18px 0 0;
+  background: #fff;
+  box-shadow: 0 -8px 28px rgba(20, 30, 25, .16);
+}
+
+.cart-sheet-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.cart-sheet-heading h3 {
+  margin: 0;
+  font: 700 17px "Manrope", sans-serif;
+}
+
+.cart-sheet-options {
+  display: grid;
+  gap: 7px;
+}
+
+.cart-sheet-options button {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  background: #fff;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cart-sheet-options button.selected {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: var(--brand-soft);
+  font-weight: 700;
+}
+
+.cart-sheet-options button.cart-sheet-create {
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.cart-sheet-note {
+  display: grid;
+  gap: 12px;
+}
+
+.cart-sheet-note textarea {
+  min-height: 110px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}
+
+.cart-sheet-note .primary-button,
+.pos-create-customer .primary-button {
+  min-height: 42px;
+}
+
+.discount-modal-layer {
+  z-index: 6;
+  align-items: center;
+  padding: 18px;
+}
+
+.discount-modal {
+  width: 100%;
+  padding: 18px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 14px 42px rgba(20, 30, 25, .2);
+}
+
+.discount-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px 48px;
+  gap: 7px;
+}
+
+.discount-input-row input {
+  min-width: 0;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+}
+
+.discount-input-row button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink-soft);
+  background: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.discount-input-row button.active {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.discount-modal > p {
+  margin: 11px 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.discount-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cart-item img { width: 56px; height: 56px; }
+.cart-item-main>div:first-child strong { font-size: 12px; }
+.cart-item-main>div:first-child span { font-size: 9px; }
+.cart-item-bottom>b { font-size: 11px; }
+.stepper span { font-size: 11px; }
+.bill>div { font-size: 10.5px; }
+.cart-quick-actions button:disabled { opacity: .55; cursor: not-allowed; }
 
 .customer-create-form {
   display: grid;

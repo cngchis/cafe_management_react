@@ -6,6 +6,7 @@ export type CreateOrderInput = {
   paymentMethod?: "cash" | "bank_transfer";
   customerName?: string;
   customerId?: string;
+  discountVnd?: number;
 };
 
 export type CreatedOrder = { id: string; orderNumber: string; totalVnd: number; changeVnd?: number; creditVnd?: number };
