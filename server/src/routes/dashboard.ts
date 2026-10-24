@@ -8,7 +8,6 @@ export const dashboardRoutes: FastifyPluginAsync = async (app) => {
     if (!account) {
       return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lòng đăng nhập." } });
     }
-    if (account.role === "cashier") return reply.code(403).send({ error: { code: "FORBIDDEN", message: "Bạn không có quyền xem tổng quan." } });
 
     const { rows: [totals] } = await pool.query<{
       today_revenue_vnd: string;
