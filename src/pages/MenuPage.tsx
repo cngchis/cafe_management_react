@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { Icon } from "../components/Icon";
 import { MenuProductDetail, type MenuItem } from "../components/MenuProductDetail";
 import { formatMoney } from "../data/products";
-import { createProduct, getProducts, updateProduct } from "../api/products";
+import { createProduct, deactivateProduct, getProducts, updateProduct } from "../api/products";
 
 const categories = ["Tất cả", "Cà phê", "Trà", "Đá xay", "Bánh ngọt"];
 
@@ -51,6 +51,14 @@ export function MenuPage() {
     setIsNewItem(false);
   };
 
+  const deleteItem = async (id: string) => {
+    setError("");
+    await deactivateProduct(id);
+    setItems((current) => current.filter((item) => item.id !== id));
+    setSelectedItem(null);
+    setIsNewItem(false);
+  };
+
   const addItem = () => {
     setSelectedItem({
       id: "",
@@ -69,7 +77,7 @@ export function MenuPage() {
   };
 
   if (selectedItem) {
-    return <MenuProductDetail product={selectedItem} isNew={isNewItem} onBack={() => { setSelectedItem(null); setIsNewItem(false); }} onSave={saveItem} />;
+    return <MenuProductDetail product={selectedItem} isNew={isNewItem} onBack={() => { setSelectedItem(null); setIsNewItem(false); }} onSave={saveItem} onDelete={deleteItem} />;
   }
 
   return <>

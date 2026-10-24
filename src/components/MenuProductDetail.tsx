@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "./Icon";
 import { formatMoney, type Product } from "../data/products";
 
@@ -15,16 +16,53 @@ type MenuProductDetailProps = {
   isNew?: boolean;
   onBack: () => void;
   onSave: (product: MenuItem) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 };
 
-export function MenuProductDetail({ product, isNew = false, onBack, onSave }: MenuProductDetailProps) {
+export function MenuProductDetail({ product, isNew = false, onBack, onSave, onDelete }: MenuProductDetailProps) {
   const [draft, setDraft] = useState(product);
   const [editing, setEditing] = useState(isNew);
   const [showPriceDetails, setShowPriceDetails] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [menuError, setMenuError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const sheetRef = useRef<HTMLElement>(null);
   const profit = draft.price - draft.cost;
   const costRate = draft.price ? (draft.cost / draft.price) * 100 : 0;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const focusableElements = () => Array.from(sheetRef.current?.querySelectorAll<HTMLElement>("button:not(:disabled)") ?? []);
+    focusableElements()[0]?.focus();
+    const handleMenuKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (!isDeleting) {
+          setMenuOpen(false);
+          setConfirmDelete(false);
+        }
+      }
+      if (event.key === "Tab") {
+        const focusable = focusableElements();
+        if (focusable.length === 0) {
+          event.preventDefault();
+          sheetRef.current?.focus();
+          return;
+        }
+        if (event.shiftKey && document.activeElement === focusable[0]) {
+          event.preventDefault();
+          focusable.at(-1)?.focus();
+        } else if (!event.shiftKey && document.activeElement === focusable.at(-1)) {
+          event.preventDefault();
+          focusable[0].focus();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleMenuKeyDown);
+    return () => window.removeEventListener("keydown", handleMenuKeyDown);
+  }, [menuOpen, confirmDelete, isDeleting]);
 
   const update = (changes: Partial<MenuItem>) => setDraft((current) => ({ ...current, ...changes }));
   const uploadImage = (file?: File) => {
@@ -71,11 +109,21 @@ export function MenuProductDetail({ product, isNew = false, onBack, onSave }: Me
       setIsSaving(false);
     }
   };
+  const deleteProduct = async () => {
+    setIsDeleting(true);
+    setSaveError("");
+    try {
+      await onDelete(product.id);
+    } catch (error) {
+      setMenuError(error instanceof Error ? error.message : "Không xóa được hàng hóa.");
+      setIsDeleting(false);
+    }
+  };
 
   return <div className="menu-detail-page page-enter">
     <nav className="menu-detail-nav" aria-label="Điều hướng chi tiết món">
       <button className="menu-detail-back" aria-label="Quay lại thực đơn" onClick={onBack}><Icon name="chevron" size={28} /></button>
-      <button className="menu-detail-more" aria-label="Tùy chọn món"><Icon name="menu" size={22} /></button>
+      {!isNew && <button className="menu-detail-more" aria-label="Tùy chọn hàng hóa" aria-haspopup="dialog" onClick={() => { setMenuError(""); setMenuOpen(true); }}><Icon name="menu" size={22} /></button>}
     </nav>
     <section className="menu-detail-card">
       <div className="menu-detail-section-heading"><span>THÔNG TIN CƠ BẢN</span><button className="menu-edit-button" disabled={isSaving} onClick={() => editing ? void save() : setEditing(true)}>{isSaving ? "Đang lưu..." : editing ? "Lưu" : "Sửa"}</button></div>
@@ -123,5 +171,22 @@ export function MenuProductDetail({ product, isNew = false, onBack, onSave }: Me
       <div className="menu-detail-pair"><div><span>Tồn cuối kỳ</span><strong>{draft.stock}</strong></div><div><span>Chi nhánh</span><strong>Chi nhánh trung tâm</strong></div></div>
     </section>
     {editing && !isNew && <button className="menu-detail-cancel" onClick={() => { setDraft(product); setEditing(false); }}>Hủy chỉnh sửa</button>}
+    {menuOpen && createPortal(<div className="menu-detail-overlay" onClick={() => { if (!isDeleting) { setMenuOpen(false); setConfirmDelete(false); } }}>
+      <section ref={sheetRef} className="menu-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="menu-detail-sheet-title" tabIndex={-1} onClick={(event) => event.stopPropagation()}>
+        <span className="menu-detail-sheet-handle" aria-hidden="true" />
+        <h2 id="menu-detail-sheet-title">{confirmDelete ? "Xóa hàng hóa?" : "Xóa hàng hóa"}</h2>
+        {confirmDelete
+          ? <p className="menu-detail-sheet-note"><strong>{product.name}</strong> sẽ được ẩn khỏi thực đơn. Lịch sử đơn hàng và tồn kho vẫn được giữ.</p>
+          : <p className="menu-detail-sheet-note">{product.name}</p>}
+        {menuError && <p className="menu-detail-sheet-error" role="alert">{menuError}</p>}
+        {confirmDelete ? <div className="menu-detail-sheet-actions">
+          <button className="menu-detail-sheet-secondary" disabled={isDeleting} onClick={() => setConfirmDelete(false)}>Giữ lại</button>
+          <button className="menu-detail-sheet-danger" disabled={isDeleting} onClick={() => void deleteProduct()}>{isDeleting ? "Đang xóa…" : "Xóa hàng hóa"}</button>
+        </div> : <>
+          <button className="menu-detail-sheet-option" onClick={() => setConfirmDelete(true)}><Icon name="trash" size={20} /><span>Xóa hàng hóa</span></button>
+          <button className="menu-detail-sheet-secondary menu-detail-sheet-close" onClick={() => setMenuOpen(false)}>Đóng</button>
+        </>}
+      </section>
+    </div>, document.body)}
   </div>;
 }

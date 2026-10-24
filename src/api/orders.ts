@@ -61,3 +61,8 @@ export async function getOrder(id: string): Promise<OrderDetailRecord> {
   const response = await fetch(`/api/orders/${id}`);
   return (await readResponse<{ order: OrderDetailRecord }>(response)).order;
 }
+
+export async function cancelOrder(id: string): Promise<void> {
+  const response = await fetch(`/api/orders/${id}/cancel`, { method: "POST" });
+  if (!response.ok) await readResponse<void>(response);
+}

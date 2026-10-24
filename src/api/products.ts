@@ -32,3 +32,8 @@ export async function updateProduct(id: string, product: ProductInput): Promise<
   });
   return (await readResponse<{ product: Product }>(response)).product;
 }
+
+export async function deactivateProduct(id: string): Promise<void> {
+  const response = await fetch(`/api/products/${id}`, { method: "DELETE" });
+  if (!response.ok) await readResponse<void>(response);
+}

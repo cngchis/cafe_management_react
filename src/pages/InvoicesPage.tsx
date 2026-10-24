@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import type { Account } from "../api/auth";
 import { Icon } from "../components/Icon";
 import { InvoiceDetail, type Invoice } from "../components/InvoiceDetail";
-import { getOrder, getOrders, type OrderDetailRecord, type OrderRecord } from "../api/orders";
+import { cancelOrder, getOrder, getOrders, type OrderDetailRecord, type OrderRecord } from "../api/orders";
 
 const periods = ["Hôm nay", "Hôm qua", "Tuần này", "Tháng này"];
 const branches = ["Tất cả chi nhánh", "Chi nhánh trung tâm"];
@@ -34,8 +35,8 @@ function toInvoice(order: OrderRecord): Invoice {
     serviceFee: order.serviceFeeVnd,
     paidAmount: order.paidAmountVnd,
     discount: order.discountVnd,
-    status: order.status === "completed" ? "Hoàn thành" : order.status,
-    paymentMethod: displayPaymentMethod(order.paymentMethod),
+    status: order.status === "completed" ? "Hoàn thành" : order.status === "cancelled" ? "Đã hủy" : order.status,
+    paymentMethod: order.status === "cancelled" ? "Đã hoàn tiền" : displayPaymentMethod(order.paymentMethod),
     orderType: displayOrderType(order),
     orderNumber: order.orderNumber,
     guests: order.guestCount,
@@ -77,7 +78,7 @@ function matchesPeriod(orderedAt: string, period: string) {
   return true;
 }
 
-export function InvoicesPage() {
+export function InvoicesPage({ role }: { role: Account["role"] }) {
   const [period, setPeriod] = useState("Hôm nay");
   const [branch, setBranch] = useState(branches[0]);
   const [query, setQuery] = useState("");
@@ -125,14 +126,24 @@ export function InvoicesPage() {
     setDetailError("");
   };
 
+  const handleCancelInvoice = async (id: string) => {
+    await cancelOrder(id);
+    setInvoices((current) => current.map((invoice) => invoice.recordId === id
+      ? { ...invoice, status: "Đã hủy", paidAmount: 0, paymentMethod: "Đã hoàn tiền" }
+      : invoice));
+    setSelectedInvoice((current) => current?.recordId === id
+      ? { ...current, status: "Đã hủy", paidAmount: 0, paymentMethod: "Đã hoàn tiền" }
+      : current);
+  };
+
   const visibleInvoices = invoices
     .filter((invoice) => matchesPeriod(invoice.orderedAt, period))
     .filter((invoice) => invoice.id.toLowerCase().includes(query.toLowerCase()) || invoice.customer.toLowerCase().includes(query.toLowerCase()))
     .slice()
     .sort((first, second) => (sortDescending ? -1 : 1) * first.orderedAt.localeCompare(second.orderedAt));
-  const invoiceTotal = visibleInvoices.reduce((sum, invoice) => sum + invoice.total, 0);
+  const invoiceTotal = visibleInvoices.reduce((sum, invoice) => sum + (invoice.status === "Hoàn thành" ? invoice.total : 0), 0);
 
-  if (selectedInvoice) return <InvoiceDetail invoice={selectedInvoice} onBack={closeInvoice} />;
+  if (selectedInvoice) return <InvoiceDetail invoice={selectedInvoice} onBack={closeInvoice} canCancel={role !== "cashier"} onCancel={handleCancelInvoice} />;
   if (selectedInvoiceId) return <div className="invoice-detail-page page-enter">
     <nav className="invoice-detail-nav" aria-label="Điều hướng chi tiết hóa đơn">
       <button className="invoice-back" aria-label="Quay lại hóa đơn" onClick={closeInvoice}><Icon name="chevron" size={28} /></button>
@@ -166,7 +177,7 @@ export function InvoicesPage() {
       {!isLoading && loadError && <div className="management-empty" role="alert"><p>{loadError}</p><button type="button" onClick={() => void loadInvoices()}>Thử lại</button></div>}
       {!isLoading && !loadError && visibleInvoices.map((invoice) => <button className="invoice-row" key={invoice.recordId} type="button" onClick={() => void openInvoice(invoice.recordId)}>
         <span className="invoice-row-copy"><strong>{invoice.id}</strong><small>{invoice.time} · {invoice.customer}</small><small>{invoice.orderType}</small></span>
-        <span className="invoice-row-values"><strong>{formatAmount(invoice.total)}</strong><small>{invoice.paymentMethod}</small></span>
+        <span className="invoice-row-values"><strong>{formatAmount(invoice.total)}</strong><small>{invoice.status === "Đã hủy" ? "Đã hủy" : invoice.paymentMethod}</small></span>
       </button>)}
       {!isLoading && !loadError && !visibleInvoices.length && <div className="management-empty">Chưa có hóa đơn trong khoảng thời gian này.</div>}
     </section>
