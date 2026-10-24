@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { getSessionAccount } from "../auth/session.js";
 import { inventoryMovements, products } from "../db/schema.js";
@@ -216,5 +216,23 @@ export const productRoutes: FastifyPluginAsync = async (app) => {
       }
       throw error;
     }
+  });
+
+  app.delete<{ Params: { id: string } }>("/products/:id", {
+    schema: {
+      params: { type: "object", required: ["id"], properties: { id: { type: "string", format: "uuid" } } },
+    },
+  }, async (request, reply) => {
+    const account = await getSessionAccount(request);
+    if (!account) return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lòng đăng nhập." } });
+    if (account.role === "cashier") return reply.code(403).send({ error: { code: "FORBIDDEN", message: "Bạn không có quyền sửa thực đơn." } });
+
+    const [deactivated] = await db.update(products)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(and(eq(products.id, request.params.id), eq(products.isActive, true)))
+      .returning({ id: products.id });
+
+    if (!deactivated) return reply.code(404).send({ error: { code: "PRODUCT_NOT_FOUND", message: "Không tìm thấy hàng hóa." } });
+    return reply.code(204).send();
   });
 };

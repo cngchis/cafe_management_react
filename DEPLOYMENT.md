@@ -26,7 +26,7 @@ Never commit `.env` or paste secret values into source code. The app requires bo
 
 After adding the variables, deploy the service and generate a Railway public domain in its Networking settings. Open `https://<railway-domain>/api/health`; the expected response is `{"status":"ok","database":"connected"}`. Then verify login, POS, and order history.
 
-No database migration is run automatically by deployment. Keep Neon as the source of truth unless a separate database migration is planned.
+No database migration is run automatically by deployment. Before deploying invoice cancellation, apply `database/migrations/0007_invoice_cancellations.sql` to Neon so inventory history accepts cancellation movements. Keep Neon as the source of truth unless a separate database migration is planned.
 
 ## Updates
 

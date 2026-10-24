@@ -1814,6 +1814,125 @@ td strong {
   transform: rotate(180deg);
 }
 
+.menu-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(20, 25, 30, .56);
+  backdrop-filter: blur(2px);
+  overscroll-behavior: contain;
+}
+
+.menu-detail-sheet {
+  width: min(100%, 560px);
+  max-height: min(80vh, 520px);
+  overflow-y: auto;
+  padding: 12px 20px calc(20px + env(safe-area-inset-bottom));
+  border: 1px solid rgba(255, 255, 255, .8);
+  border-bottom: 0;
+  border-radius: 24px 24px 0 0;
+  background: #fff;
+  box-shadow: 0 -14px 42px rgba(20, 25, 30, .18);
+  animation: menu-sheet-enter .18s ease-out;
+}
+
+.menu-detail-sheet-handle {
+  width: 38px;
+  height: 4px;
+  margin: 0 auto 18px;
+  display: block;
+  border-radius: 4px;
+  background: #d8dce0;
+}
+
+.menu-detail-sheet h2 {
+  margin: 0;
+  color: var(--ink);
+  font: 700 18px/1.35 "Manrope", sans-serif;
+}
+
+.menu-detail-sheet-note {
+  margin: 8px 0 18px;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.menu-detail-sheet-note strong {
+  color: var(--ink);
+}
+
+.menu-detail-sheet-option {
+  width: 100%;
+  min-height: 56px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #f0d8d6;
+  border-radius: 12px;
+  color: #c83d37;
+  background: #fff8f7;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-detail-sheet-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.menu-detail-sheet-secondary,
+.menu-detail-sheet-danger {
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.menu-detail-sheet-danger {
+  border-color: #c83d37;
+  color: #fff;
+  background: #c83d37;
+}
+
+.menu-detail-sheet-close {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.menu-detail-sheet-actions button:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.menu-detail-sheet-error {
+  margin: 0 0 14px;
+  color: #a8322b;
+  font-size: 13px;
+}
+
+@keyframes menu-sheet-enter {
+  from { transform: translateY(18px); opacity: .7; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-detail-sheet {
+    animation: none;
+  }
+}
+
 .menu-detail-card {
   margin-bottom: 16px;
   padding: 22px 20px;
@@ -2198,6 +2317,11 @@ td strong {
   background: #e8f5eb;
   font-size: 12px;
   font-weight: 600;
+}
+
+.invoice-paid.cancelled {
+  color: #a8322b;
+  background: #fce8e7;
 }
 
 .invoice-customer {

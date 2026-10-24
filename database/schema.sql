@@ -173,7 +173,7 @@ CREATE TABLE inventory_movements (
     occurred_at timestamptz NOT NULL DEFAULT now(),
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT inventory_movements_nonzero_delta CHECK (quantity_delta <> 0),
-    CONSTRAINT inventory_movements_reason_check CHECK (reason IN ('opening_balance', 'manual_adjustment', 'correction'))
+    CONSTRAINT inventory_movements_reason_check CHECK (reason IN ('opening_balance', 'manual_adjustment', 'correction', 'sale', 'sale_cancellation'))
 );
 
 CREATE INDEX inventory_product_history_idx ON inventory_movements (product_id, occurred_at DESC);

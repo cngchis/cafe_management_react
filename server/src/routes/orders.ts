@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { getSessionAccount } from "../auth/session.js";
 import { cashAccounts, cashbookEntries, inventoryMovements, orderItems, orders, payments, products } from "../db/schema.js";
@@ -55,10 +55,10 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
       status: orders.status,
       orderedAt: orders.orderedAt,
       paymentMethod: sql<string | null>`min(${payments.method})`,
-      paidAmountVnd: sql<number>`coalesce(sum(${payments.amountVnd}), 0)`.mapWith(Number),
+      paidAmountVnd: sql<number>`coalesce(sum(case when ${payments.status} = 'completed' then ${payments.amountVnd} else 0 end), 0)`.mapWith(Number),
     }).from(orders)
       .leftJoin(payments, eq(payments.orderId, orders.id))
-      .where(eq(orders.status, "completed"))
+      .where(inArray(orders.status, ["completed", "cancelled"]))
       .groupBy(orders.id)
       .orderBy(desc(orders.orderedAt))
       .limit(100);
@@ -103,14 +103,86 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
     const paymentRows = await db.select({
       method: payments.method,
       amountVnd: payments.amountVnd,
+      status: payments.status,
     }).from(payments).where(eq(payments.orderId, order.id)).orderBy(desc(payments.paidAt));
 
     return { order: {
       ...order,
       paymentMethod: paymentRows[0]?.method ?? null,
-      paidAmountVnd: paymentRows.reduce((sum, payment) => sum + payment.amountVnd, 0),
+      paidAmountVnd: paymentRows.reduce((sum, payment) => sum + (payment.status === "completed" ? payment.amountVnd : 0), 0),
       items,
     } };
+  });
+
+  app.post<{ Params: { id: string } }>("/orders/:id/cancel", {
+    schema: {
+      params: { type: "object", required: ["id"], properties: { id: { type: "string", format: "uuid" } } },
+    },
+  }, async (request, reply) => {
+    const account = await getSessionAccount(request);
+    if (!account) return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lòng đăng nhập." } });
+    if (account.role === "cashier") return reply.code(403).send({ error: { code: "FORBIDDEN", message: "Bạn không có quyền hủy hóa đơn." } });
+
+    const result = await db.transaction(async (tx) => {
+      const [order] = await tx.select({
+        id: orders.id,
+        orderNumber: orders.orderNumber,
+        status: orders.status,
+      }).from(orders).where(eq(orders.id, request.params.id)).for("update").limit(1);
+      if (!order) throw Object.assign(new Error("Không tìm thấy hóa đơn."), { statusCode: 404, code: "ORDER_NOT_FOUND" });
+      if (order.status !== "completed") throw Object.assign(new Error("Chỉ có thể hủy hóa đơn đã hoàn thành."), { statusCode: 409, code: "ORDER_NOT_CANCELLABLE" });
+
+      const completedPayments = await tx.select({ id: payments.id, amountVnd: payments.amountVnd })
+        .from(payments).where(and(eq(payments.orderId, order.id), eq(payments.status, "completed"))).for("update");
+      const refunds: Array<{ cashAccountId: string; amountVnd: number }> = [];
+      for (const payment of completedPayments) {
+        const [cashEntry] = await tx.select({ cashAccountId: cashbookEntries.cashAccountId })
+          .from(cashbookEntries).where(eq(cashbookEntries.paymentId, payment.id)).limit(1);
+        if (!cashEntry) throw Object.assign(new Error("Không tìm thấy giao dịch thu tiền để đối soát hủy hóa đơn."), { statusCode: 409, code: "PAYMENT_LEDGER_MISSING" });
+        refunds.push({ cashAccountId: cashEntry.cashAccountId, amountVnd: payment.amountVnd });
+      }
+
+      const soldItems = await tx.select({ productId: orderItems.productId, quantity: orderItems.quantity })
+        .from(orderItems).where(eq(orderItems.orderId, order.id));
+      const now = new Date();
+
+      for (const refund of refunds) {
+        await tx.insert(cashbookEntries).values({
+          cashAccountId: refund.cashAccountId,
+          referenceCode: `HT${crypto.randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase()}`,
+          direction: "out",
+          title: "Hoàn tiền hủy hóa đơn",
+          category: "Hoàn tiền bán hàng",
+          counterpartyGroup: "Khách hàng",
+          counterpartyName: "Khách hàng",
+          description: `Hoàn tiền hóa đơn ${order.orderNumber}`,
+          amountVnd: refund.amountVnd,
+          createdByName: account.displayName,
+          occurredAt: now,
+        });
+      }
+
+      if (completedPayments.length) {
+        await tx.update(payments).set({ status: "refunded" })
+          .where(and(eq(payments.orderId, order.id), eq(payments.status, "completed")));
+      }
+      const restockItems = soldItems.filter((item): item is { productId: string; quantity: number } => item.productId !== null);
+      if (restockItems.length) {
+        await tx.insert(inventoryMovements).values(restockItems.map((item) => ({
+          productId: item.productId,
+          quantityDelta: item.quantity,
+          reason: "sale_cancellation" as const,
+          note: `Nhập lại hàng do hủy hóa đơn ${order.orderNumber}`,
+          createdByName: account.displayName,
+          occurredAt: now,
+        })));
+      }
+
+      await tx.update(orders).set({ status: "cancelled", updatedAt: now }).where(eq(orders.id, order.id));
+      return { id: order.id, status: "cancelled" as const };
+    });
+
+    return { order: result };
   });
 
   app.post<{ Body: CreateOrderBody; Headers: { "idempotency-key"?: string } }>("/orders", {

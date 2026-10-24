@@ -58,7 +58,7 @@ function AppShell({ account, onSignIn, onSignOut }: { account: Account | null; o
         <Route path="/work-schedule" element={<WorkSchedulePage />} />
         <Route path="/payroll" element={<PayrollPage />} />
         <Route path="/inventory-check" element={<InventoryCheckPage />} />
-        <Route path="/invoices" element={<InvoicesPage />} />
+        <Route path="/invoices" element={<InvoicesPage role={account.role} />} />
         <Route path="/cashbook" element={<CashbookPage />} />
         <Route path="/customers" element={<CustomersPage />} />
         <Route path="/more" element={<MorePage navigate={navigate} onSignOut={onSignOut} account={account} />} />

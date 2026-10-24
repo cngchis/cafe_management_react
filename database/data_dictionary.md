@@ -153,7 +153,7 @@ Các thay đổi có dấu đối với tồn kho món bán của cửa hàng du
 | `id` | `uuid` | Khóa chính. |
 | `product_id` | `uuid` | Khóa ngoại bắt buộc đến `products`. |
 | `quantity_delta` | `numeric(14,3)` | Lượng thay đổi có dấu, khác không. |
-| `reason` | `text` | `opening_balance`, `manual_adjustment` hoặc `correction`; không mã hóa luồng hao hụt/nhập mua chưa được triển khai. |
+| `reason` | `text` | `opening_balance`, `manual_adjustment`, `correction`, `sale` hoặc `sale_cancellation`; ghi lại điều chỉnh tồn do bán hoặc hủy hóa đơn. |
 | `note` | `text` | Diễn giải điều chỉnh tùy chọn. |
 | `created_by_name` | `text` | Ảnh chụp tên người thao tác. |
 | `occurred_at` | `timestamptz` | Thời điểm thay đổi tồn kho phát sinh. |

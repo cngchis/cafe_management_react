@@ -49,7 +49,7 @@ export const inventoryMovements = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "restrict" }),
     quantityDelta: numeric("quantity_delta", { precision: 14, scale: 3, mode: "number" }).notNull(),
-    reason: text("reason", { enum: ["opening_balance", "manual_adjustment", "correction", "sale"] }).notNull(),
+    reason: text("reason", { enum: ["opening_balance", "manual_adjustment", "correction", "sale", "sale_cancellation"] }).notNull(),
     note: text("note"),
     createdByName: text("created_by_name"),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
