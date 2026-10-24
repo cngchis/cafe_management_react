@@ -20,7 +20,10 @@ export function PosPage() {
   const [customerId, setCustomerId] = useState("");
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState("");
-  const categories = ["Tất cả", "Cà phê", "Trà", "Đá xay", "Bánh ngọt"];
+  const categories = [
+    "Tất cả",
+    ...new Set(products.map((product) => product.category).filter(Boolean)),
+  ];
   const visibleProducts = products.filter((item) => (category === "Tất cả" || item.category === category) && item.name.toLowerCase().includes(query.toLowerCase()));
   const cartItems = products.filter((item) => cart[item.id]).map((item) => ({ ...item, quantity: cart[item.id] }));
   const cartCount = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
@@ -67,7 +70,9 @@ export function PosPage() {
     <section className="catalog">
       <div className="catalog-sticky">
         <div className="pos-heading"><div><h2 className="eyebrow">THỰC ĐƠN</h2><p>Chọn món để thêm vào đơn hàng</p></div><div className="pos-actions"><label className="search-box"><Icon name="search" size={19} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm món..." /></label></div></div>
-        <div className="category-tabs">{categories.map((item) => <button className={category === item ? "active" : ""} key={item} onClick={() => setCategory(item)}>{item}</button>)}</div>
+        <div className="category-tabs">
+          {categories.map((item) => <button className={category === item ? "active" : ""} key={item} onClick={() => setCategory(item)}>{item}</button>)}
+        </div>
       </div>
       {catalogError && <div className="empty-state" role="alert"><strong>{catalogError}</strong></div>}
       {catalogLoading && <div className="empty-state" role="status">Đang tải thực đơn...</div>}

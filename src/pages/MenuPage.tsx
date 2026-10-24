@@ -5,8 +5,6 @@ import { MenuProductDetail, type MenuItem } from "../components/MenuProductDetai
 import { formatMoney } from "../data/products";
 import { createProduct, deactivateProduct, getProducts, updateProduct } from "../api/products";
 
-const categories = ["Tất cả", "Cà phê", "Trà", "Đá xay", "Bánh ngọt"];
-
 export function MenuPage() {
   const [category, setCategory] = useState("Tất cả");
   const [query, setQuery] = useState("");
@@ -18,7 +16,10 @@ export function MenuPage() {
   const [sort, setSort] = useState("price-asc");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-
+  const categories = [
+    "Tất cả",
+    ...new Set(items.map((item) => item.category).filter(Boolean)),
+  ];
   useEffect(() => {
     getProducts()
       .then((products) => setItems(products.map((product) => ({ ...product, ingredients: [] }))))
