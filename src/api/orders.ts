@@ -1,6 +1,7 @@
 export type CreateOrderInput = {
   items: Array<{ productId: string; quantity: number }>;
   orderType: "dine_in" | "takeaway" | "delivery";
+  serviceLocation?: string;
   mode?: "payment" | "estimate";
   note?: string;
   amountReceivedVnd?: number;

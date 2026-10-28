@@ -5,7 +5,7 @@ import type { Account } from "../api/auth";
 const navigation = [
   { label: "Tổng quan", icon: "chart" as IconName, path: "/" },
   { label: "Món", icon: "coffee" as IconName, path: "/menu" },
-  { label: "Bán hàng", icon: "cart" as IconName, path: "/pos" },
+  { label: "Bán hàng", icon: "cart" as IconName, path: "/pos/select" },
   { label: "Hóa đơn", icon: "receipt" as IconName, path: "/invoices" },
   { label: "Nhiều hơn", icon: "menu" as IconName, path: "/more" }
 ];

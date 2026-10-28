@@ -23,6 +23,7 @@ import { purchaseRoutes } from "./routes/purchases.js";
 import { priceListRoutes } from "./routes/price-lists.js";
 import { activityRoutes } from "./routes/activity.js";
 import { customerRoutes } from "./routes/customers.js";
+import { serviceTableRoutes } from "./routes/service-tables.js";
 import { getSessionAccount } from "./auth/session.js";
 import { readFile } from "node:fs/promises";
 import { extname, join, resolve, sep } from "node:path";
@@ -153,6 +154,7 @@ export async function createApp() {
   await app.register(priceListRoutes, { prefix: "/api" });
   await app.register(activityRoutes, { prefix: "/api" });
   await app.register(customerRoutes, { prefix: "/api" });
+  await app.register(serviceTableRoutes, { prefix: "/api" });
 
   const staticRoot = resolve(process.cwd(), "dist");
   const contentTypes: Record<string, string> = {

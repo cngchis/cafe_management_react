@@ -4,6 +4,8 @@ import { Icon } from "./components/Icon";
 import { Sidebar } from "./components/Sidebar";
 import { DashboardPage } from "./pages/DashboardPage";
 import { PosPage } from "./pages/PosPage";
+import { PosTableSelectionPage } from "./pages/PosTableSelectionPage";
+import { TablesPage } from "./pages/TablesPage";
 import { MenuPage } from "./pages/MenuPage";
 import { InvoicesPage } from "./pages/InvoicesPage";
 import { CustomersPage } from "./pages/CustomersPage";
@@ -33,7 +35,7 @@ function Header({ title }: { title: string }) {
 
 const pathsByView: Record<string, string> = {
   "Tổng quan": "/",
-  "Thu ngân": "/pos",
+  "Thu ngân": "/pos/select",
   "Món": "/menu",
   "Nhân viên": "/employees",
   "Lịch làm việc": "/work-schedule",
@@ -59,6 +61,8 @@ function AppShell({ account, onSignIn, onSignOut }: { account: Account | null; o
       <Routes>
         <Route path="/" element={<DashboardPage goPos={() => navigate(pathsByView["Thu ngân"])} />} />
         <Route path="/pos" element={<PosPage />} />
+        <Route path="/pos/select" element={<PosTableSelectionPage />} />
+        <Route path="/tables" element={<TablesPage />} />
         <Route path="/menu" element={<MenuPage />} />
         <Route path="/employees" element={<EmployeesPage />} />
         <Route path="/work-schedule" element={<WorkSchedulePage />} />

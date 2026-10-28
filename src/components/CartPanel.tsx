@@ -16,6 +16,7 @@ type CartPanelProps = {
   estimate: OrderDetailRecord | null;
   estimateLoading: boolean;
   estimateError: string;
+  initialOrderType: "Tại bàn" | "Mang về" | "Giao đi";
   onCustomerChange: (customerId: string) => void;
   onCustomerCreated: (customer: CustomerTarget) => void;
   onUpdateCart: (id: string, delta: number) => void;
@@ -26,8 +27,8 @@ type CartPanelProps = {
   onDeleteEstimate: (id: string) => Promise<void>;
 };
 
-export function CartPanel({ items, customers, customerId, bankAccount, estimate, estimateLoading, estimateError, onCustomerChange, onCustomerCreated, onUpdateCart, onClearCart, onClose, onComplete, onPayEstimate, onDeleteEstimate }: CartPanelProps) {
-  const [orderType, setOrderType] = useState("Mang về");
+export function CartPanel({ items, customers, customerId, bankAccount, estimate, estimateLoading, estimateError, initialOrderType, onCustomerChange, onCustomerCreated, onUpdateCart, onClearCart, onClose, onComplete, onPayEstimate, onDeleteEstimate }: CartPanelProps) {
+  const [orderType, setOrderType] = useState(initialOrderType);
   const [orderNote, setOrderNote] = useState("");
   const [paid, setPaid] = useState(false);
   const [savedEstimate, setSavedEstimate] = useState(false);

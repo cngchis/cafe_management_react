@@ -302,6 +302,18 @@ export const inventoryChecks = pgTable("inventory_checks", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const serviceTables = pgTable("service_tables", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  roomName: text("room_name").notNull(),
+  tableName: text("table_name").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("service_tables_room_table_active_unique_idx").on(sql`lower(${table.roomName})`, sql`lower(${table.tableName})`).where(sql`${table.isActive}`),
+  index("service_tables_active_room_idx").on(sql`lower(${table.roomName})`, table.tableName).where(sql`${table.isActive}`),
+]);
+
 export const inventoryCheckItems = pgTable("inventory_check_items", {
   id: uuid("id").defaultRandom().primaryKey(),
   checkId: uuid("check_id").notNull().references(() => inventoryChecks.id, { onDelete: "restrict" }),

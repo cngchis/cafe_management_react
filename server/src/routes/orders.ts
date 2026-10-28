@@ -24,6 +24,7 @@ const bodySchema = {
       },
     },
     orderType: { type: "string", enum: ["dine_in", "takeaway", "delivery"] },
+    serviceLocation: { type: "string", maxLength: 200 },
     mode: { type: "string", enum: ["payment", "estimate"] },
     note: { type: "string", maxLength: 2000 },
     amountReceivedVnd: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
@@ -39,6 +40,7 @@ const bodySchema = {
 type CreateOrderBody = {
   items: Array<{ productId: string; quantity: number }>;
   orderType: "dine_in" | "takeaway" | "delivery";
+  serviceLocation?: string;
   mode?: "payment" | "estimate";
   note?: string;
   amountReceivedVnd?: number;
@@ -432,7 +434,7 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
         orderNumber,
         status: isEstimate ? "awaiting_payment" : "completed",
         orderType: request.body.orderType,
-        serviceLocation: request.body.orderType === "dine_in" ? "Bàn 06" : request.body.orderType === "delivery" ? "Giao hàng" : "Mang đi",
+        serviceLocation: request.body.orderType === "dine_in" ? request.body.serviceLocation?.trim() || "Tại bàn" : request.body.orderType === "delivery" ? "Giao hàng" : "Mang đi",
         cashierName: account.displayName,
         orderNote: request.body.note?.trim() || null,
         subtotalVnd: Number(subtotal),

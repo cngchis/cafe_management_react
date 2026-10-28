@@ -3550,6 +3550,72 @@ td strong {
   }
 }
 
+.pos-table-selection {
+  min-height: calc(100vh - 32px);
+  padding: 0 0 32px;
+  background: #f6f6f6;
+}
+
+.pos-table-selection-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 24px;
+  background: #fff;
+}
+
+.pos-table-brand { display: flex; align-items: center; gap: 9px; margin-right: auto; color: #18345c; font-size: 20px; }
+.pos-table-brand span { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 50%; background: #e9f2ff; color: var(--brand); }
+.pos-table-selection-header .eyebrow { margin: 0; color: var(--ink-soft); font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+.pos-table-selection-header h2 { margin: 2px 0 0; font-size: 20px; }
+
+.pos-table-status-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0 22px;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+
+.pos-table-status-tabs button { min-height: 58px; position: relative; border: 0; background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+.pos-table-status-tabs button.active { color: var(--brand); font-weight: 700; }
+.pos-table-status-tabs button.active::after { content: ""; position: absolute; right: 0; bottom: 0; left: 0; height: 3px; background: var(--brand); }
+.pos-table-status-tabs button span { margin-left: 6px; color: var(--ink-soft); font-size: 11px; }
+
+.pos-table-filters { display: flex; gap: 10px; padding: 18px 20px; }
+.pos-table-filters button { min-height: 40px; padding: 0 18px; border: 1px solid transparent; border-radius: 22px; background: #fff; color: var(--ink-soft); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.pos-table-filters button.active { border-color: #c7d9f4; background: #eaf2ff; color: var(--brand); }
+
+.pos-service-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 0 20px; }
+.pos-service-card { min-height: 172px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 22px; border: 1px solid #dedede; border-radius: 18px; background: #fff; color: var(--ink); text-align: left; cursor: pointer; transition: border-color .16s, box-shadow .16s, transform .16s; }
+.pos-service-card:hover { transform: translateY(-1px); border-color: #9db9e4; box-shadow: 0 8px 24px rgba(28, 55, 92, .08); }
+.pos-service-card.occupied { border-color: #efc886; background: #fffaf0; }
+.pos-service-title { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; }
+.pos-service-title svg { color: var(--brand); }
+.pos-service-card small { color: var(--ink-soft); font-size: 13px; }
+.pos-service-status { margin-top: auto; color: var(--ink-soft); font-size: 12px; }
+.pos-service-card.occupied .pos-service-status { color: #9a6500; font-weight: 700; }
+.pos-no-tables { grid-column: 1 / -1; padding: 24px; }
+
+.service-tables-page { display: grid; gap: 16px; }
+.service-tables-heading h2 { margin: 4px 0; font-size: 24px; }
+.service-tables-heading p { margin: 0; color: var(--ink-soft); font-size: 13px; }
+.service-tables-heading .eyebrow { color: var(--brand); font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+.pos-table-selection .management-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 20px 16px; padding: 12px; border: 1px solid #e6b5b5; border-radius: 10px; background: #fff4f4; color: #a52c2c; font-size: 13px; }
+.service-table-form-card, .service-room-card { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.service-table-form-card h3, .service-room-heading h3 { margin: 0; font-size: 16px; }
+.service-table-form { display: grid; grid-template-columns: 1fr 1fr auto; align-items: end; gap: 12px; margin-top: 14px; }
+.service-table-form .setting-field { margin: 0; }
+.service-table-form .primary-button { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.service-room-heading { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.service-room-heading span, .service-room-item small { color: var(--ink-soft); font-size: 12px; }
+.service-room-list { display: grid; }
+.service-room-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 58px; border-bottom: 1px solid var(--line); }
+.service-room-item:last-child { border-bottom: 0; }
+.service-room-item strong, .service-room-item small { display: block; }
+.service-room-item small { margin-top: 3px; }
+.danger-text { color: #bf3434; }
+
 .pos-layout {
   height: calc(100vh - 190px);
   min-height: 620px;
@@ -4928,4 +4994,22 @@ td strong {
   .pos-layout {
     height: calc(100vh - 68px - 82px);
   }
+}
+
+@media (max-width: 600px) {
+  .pos-table-selection { min-height: calc(100dvh - 68px); }
+  .pos-table-selection-header { gap: 10px; padding: 12px 14px; }
+  .pos-table-brand { gap: 6px; font-size: 17px; }
+  .pos-table-brand span { width: 34px; height: 34px; }
+  .pos-table-selection-header h2 { font-size: 17px; }
+  .pos-table-status-tabs { padding: 0 10px; }
+  .pos-table-status-tabs button { min-height: 52px; font-size: 13px; }
+  .pos-table-filters { padding: 14px; }
+  .pos-service-grid { gap: 10px; padding: 0 12px; }
+  .pos-service-card { min-height: 138px; padding: 16px; border-radius: 15px; }
+  .pos-service-title { gap: 7px; font-size: 16px; }
+  .pos-service-title svg { width: 17px; }
+  .pos-service-card small, .pos-service-status { font-size: 11px; }
+  .service-table-form { grid-template-columns: 1fr; }
+  .service-table-form .primary-button { width: 100%; }
 }

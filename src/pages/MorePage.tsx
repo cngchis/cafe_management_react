@@ -20,6 +20,13 @@ const groups: { title: string; layout: "tiles" | "list"; items: MoreItem[] }[] =
     ],
   },
   {
+    title: "Phòng bàn",
+    layout: "tiles",
+    items: [
+      { label: "Phòng bàn", icon: "chair", path: "/tables", roles: ["owner", "manager"] },
+    ],
+  },
+  {
     title: "Hóa đơn",
     layout: "tiles",
     items: [
