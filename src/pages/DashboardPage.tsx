@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Icon, type IconName } from "../components/Icon";
 import { formatMoney } from "../data/products";
 import { getDashboardSummary, type DashboardSummary } from "../api/dashboard";
+import { getActivity, type ActivityRecord } from "../api/moreOperations";
 
 function StatCard({ label, value, note, icon, tone }: { label: string; value: string; note: string; icon: IconName; tone: string }) {
   return <article className="stat-card"><div className={`stat-icon ${tone}`}><Icon name={icon} /></div><div className="stat-copy"><span>{label}</span><strong>{value}</strong><small><b><Icon name="trend" size={13} /> {note}</b> so với hôm qua</small></div></article>;
@@ -25,10 +26,14 @@ function orderLocation(order: DashboardSummary["recentOrders"][number]) {
   return "Mang đi";
 }
 
-export function DashboardPage({ goPos }: { goPos: () => void }) {
+export function DashboardPage({ goPos, canViewActivity = true }: { goPos: () => void; canViewActivity?: boolean }) {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [activity, setActivity] = useState<ActivityRecord[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState("");
 
   const loadSummary = async () => {
     setIsLoading(true);
@@ -44,6 +49,15 @@ export function DashboardPage({ goPos }: { goPos: () => void }) {
 
   useEffect(() => { void loadSummary(); }, []);
 
+  const openActivity = async () => {
+    setActivityOpen(true);
+    setActivityLoading(true);
+    setActivityError("");
+    try { setActivity((await getActivity()).events.slice(0, 12)); }
+    catch (cause) { setActivityError(cause instanceof Error ? cause.message : "Không tải được lịch sử thao tác."); }
+    finally { setActivityLoading(false); }
+  };
+
   const today = summary?.today;
   const yesterday = summary?.yesterday;
   const maxRevenue = Math.max(1, ...(summary?.weeklyRevenue.map((day) => day.revenueVnd) ?? []));
@@ -53,7 +67,10 @@ export function DashboardPage({ goPos }: { goPos: () => void }) {
   return <div className="dashboard page-enter">
     <section className="welcome">
       <div><span className="eyebrow"><Icon name="spark" size={15} /> TỔNG QUAN HÔM NAY</span><h2>Hoạt động cửa hàng</h2><p>{today?.orderCount ?? 0} đơn hoàn tất · {formatMoney(today?.revenueVnd ?? 0)} doanh thu.</p></div>
-      <button className="primary-button" onClick={goPos}><Icon name="plus" /> Tạo đơn hàng</button>
+      <div className="dashboard-welcome-actions">
+        {canViewActivity && <button className="dashboard-notifications-button" type="button" aria-label="Thông báo và lịch sử thao tác" title="Thông báo" onClick={() => void openActivity()}><Icon name="bell" size={19} /></button>}
+        <button className="primary-button" onClick={goPos}><Icon name="plus" /> Tạo đơn hàng</button>
+      </div>
     </section>
     {error && <div className="dashboard-data-error" role="alert"><span>{error}</span><button type="button" onClick={() => void loadSummary()}>Thử lại</button></div>}
     <section className="stats-grid" aria-busy={isLoading}>
@@ -99,5 +116,12 @@ export function DashboardPage({ goPos }: { goPos: () => void }) {
         {!isLoading && !error && !summary?.recentOrders.length && <tr><td colSpan={6}>Chưa có đơn hàng đã thanh toán.</td></tr>}
       </tbody></table></div>
     </article>
+    {activityOpen && <div className="dashboard-notifications-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setActivityOpen(false); }}><section className="dashboard-notifications-dialog" role="dialog" aria-modal="true" aria-labelledby="dashboard-notifications-title">
+      <header><div><h3 id="dashboard-notifications-title">Thông báo</h3><p>Lịch sử thao tác gần đây</p></div><button className="icon-button" type="button" aria-label="Đóng thông báo" onClick={() => setActivityOpen(false)}><Icon name="close" size={18} /></button></header>
+      {activityLoading && <p className="management-empty" role="status">Đang tải lịch sử thao tác...</p>}
+      {activityError && <div className="dashboard-notifications-error" role="alert">{activityError}<button className="text-button" type="button" onClick={() => void openActivity()}>Thử lại</button></div>}
+      {!activityLoading && !activityError && activity.length === 0 && <p className="management-empty">Chưa có thao tác nào được ghi nhận.</p>}
+      {!activityLoading && !activityError && activity.map((event) => <article className="dashboard-notification-row" key={event.id}><span className="activity-dot" aria-hidden="true" /><div><strong>{event.summary}</strong><small>{event.actorName}</small></div><time dateTime={event.occurredAt}>{new Date(event.occurredAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}</time></article>)}
+    </section></div>}
   </div>;
 }

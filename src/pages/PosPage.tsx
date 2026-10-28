@@ -21,6 +21,7 @@ export function PosPage() {
   const initialOrderType = routeOrderType === "dine_in" ? "Tại bàn" : routeOrderType === "delivery" ? "Giao đi" : "Mang về";
   const [category, setCategory] = useState("Tất cả");
   const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [cart, setCart] = useState<Cart>({});
   const [cartOpen, setCartOpen] = useState(false);
   const [successNotice, setSuccessNotice] = useState<{ title: string; detail: string } | null>(null);
@@ -44,6 +45,7 @@ export function PosPage() {
   const visibleProducts = products.filter((item) => (category === "Tất cả" || item.category === category) && item.name.toLowerCase().includes(query.toLowerCase()));
   const cartItems = products.filter((item) => cart[item.id]).map((item) => ({ ...item, quantity: cart[item.id] }));
   const cartCount = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
+  const orderTypeLabel = (estimate?.orderType ?? routeOrderType) === "dine_in" ? "Tại bàn" : (estimate?.orderType ?? routeOrderType) === "delivery" ? "Giao đi" : "Mang về";
   const updateCart = (id: string, delta: number) => setCart((current) => {
     const next = Math.max(0, (current[id] || 0) + delta);
     const updated = { ...current, [id]: next };
@@ -145,7 +147,7 @@ export function PosPage() {
   return <div className="pos-layout page-enter">
     <section className="catalog">
       <div className="catalog-sticky">
-        <div className="pos-heading"><div><h2 className="eyebrow">THỰC ĐƠN</h2><p>Chọn món để thêm vào đơn hàng</p></div><div className="pos-actions"><label className="search-box"><Icon name="search" size={19} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm món..." /></label><button type="button" className="pos-estimates-button" onClick={() => void openEstimateList()}><Icon name="receipt" size={17} /><span>Đơn tạm tính</span></button></div></div>
+        <div className="pos-heading"><div className="pos-heading-context"><button type="button" className="pos-back-button" aria-label="Quay lại chọn phòng bàn" title="Chọn phòng bàn" onClick={() => navigate("/pos/select")}><Icon name="chevron" size={20} /></button><span className="eyebrow">{orderTypeLabel}</span></div><div className="pos-actions"><div className={`pos-search-box ${searchOpen ? "is-open" : ""}`}><button type="button" aria-label={searchOpen ? "Đóng tìm kiếm" : "Tìm món"} onClick={() => { setSearchOpen((open) => !open); if (searchOpen) setQuery(""); }}><Icon name="search" size={19} /></button>{searchOpen && <input autoFocus aria-label="Tìm món" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm món..." />}</div><button type="button" className="pos-estimates-button" aria-label="Đơn tạm tính" title="Đơn tạm tính" onClick={() => void openEstimateList()}><Icon name="receipt" size={19} /></button></div></div>
         <div className="category-tabs">
           {categories.map((item) => <button className={category === item ? "active" : ""} key={item} onClick={() => setCategory(item)}>{item}</button>)}
         </div>

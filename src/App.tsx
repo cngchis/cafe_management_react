@@ -59,7 +59,7 @@ function AppShell({ account, onSignIn, onSignOut }: { account: Account | null; o
     <main className="main-area">
       {/* <div className="view-switcher"><button className={view !== "Thu ngân" ? "active" : ""} onClick={() => setView("Tổng quan")}><Icon name="grid" size={17} /> Quản lý</button><button className={view === "Thu ngân" ? "active" : ""} onClick={() => setView("Thu ngân")}><Icon name="receipt" size={17} /> Thu ngân</button></div> */}
       <Routes>
-        <Route path="/" element={<DashboardPage goPos={() => navigate(pathsByView["Thu ngân"])} />} />
+        <Route path="/" element={<DashboardPage goPos={() => navigate(pathsByView["Thu ngân"])} canViewActivity={account.role !== "cashier"} />} />
         <Route path="/pos" element={<PosPage />} />
         <Route path="/pos/select" element={<PosTableSelectionPage />} />
         <Route path="/tables" element={<TablesPage />} />

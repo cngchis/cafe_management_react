@@ -403,6 +403,20 @@ input:focus-visible {
   gap: 20px;
 }
 
+.dashboard-welcome-actions { display: flex; align-items: center; gap: 10px; }
+.dashboard-notifications-button { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); cursor: pointer; }
+.dashboard-notifications-button:hover { border-color: var(--brand); color: var(--brand); }
+.dashboard-notifications-overlay { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px; background: rgba(25, 30, 38, .48); }
+.dashboard-notifications-dialog { width: min(560px, 100%); max-height: min(76vh, 680px); overflow: auto; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 20px 60px rgba(20, 26, 34, .22); }
+.dashboard-notifications-dialog > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--line); }
+.dashboard-notifications-dialog h3 { margin: 0; font-size: 17px; }
+.dashboard-notifications-dialog header p { margin: 4px 0 0; color: var(--ink-soft); font-size: 12px; }
+.dashboard-notification-row { min-height: 68px; display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--line); }
+.dashboard-notification-row strong, .dashboard-notification-row small { display: block; }
+.dashboard-notification-row strong { font-size: 13px; }
+.dashboard-notification-row small, .dashboard-notification-row time { margin-top: 4px; color: var(--ink-soft); font-size: 11px; }
+.dashboard-notifications-error { display: flex; justify-content: space-between; gap: 12px; padding: 16px 20px; color: #a52c2c; font-size: 13px; }
+
 .eyebrow {
   display: flex;
   align-items: center;
@@ -3640,10 +3654,15 @@ td strong {
 
 .pos-heading {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 20px;
 }
+
+.pos-heading-context { min-width: 0; display: flex; align-items: center; gap: 10px; }
+.pos-heading-context .eyebrow { margin: 0; font-size: 11px; white-space: nowrap; }
+.pos-back-button { width: 36px; height: 36px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); cursor: pointer; }
+.pos-back-button svg { transform: rotate(180deg); }
 
 .pos-actions {
   display: flex;
@@ -3656,8 +3675,12 @@ td strong {
   min-width: 0;
 }
 
-.pos-estimates-button { min-height: 38px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; flex: none; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.pos-estimates-button { width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; flex: none; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); cursor: pointer; }
 .pos-estimates-button:hover { border-color: var(--brand); color: var(--brand); }
+.pos-search-box { width: 40px; height: 40px; display: flex; align-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 9px; background: #fff; transition: width .2s ease; }
+.pos-search-box.is-open { width: min(230px, 42vw); }
+.pos-search-box button { width: 40px; height: 38px; flex: 0 0 40px; display: grid; place-items: center; border: 0; background: transparent; color: var(--ink-soft); cursor: pointer; }
+.pos-search-box input { min-width: 0; width: 100%; padding: 0 8px 0 0; border: 0; outline: 0; background: transparent; color: var(--ink); font: inherit; font-size: 13px; }
 .estimate-list-overlay { position: fixed; inset: 0; z-index: 85; padding: 18px; display: grid; place-items: center; background: rgba(22, 29, 38, .5); }
 .estimate-list-dialog { width: min(480px, 100%); max-height: min(78vh, 620px); overflow: auto; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 18px 50px rgba(15, 23, 42, .2); }
 .estimate-list-dialog > header { padding: 18px 18px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); }
@@ -4226,7 +4249,7 @@ td strong {
 .cart-quick-actions {
   flex: none;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
   padding: 2px 16px 12px;
 }
@@ -4846,15 +4869,23 @@ td strong {
   }
 
   .pos-heading {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
+    gap: 8px;
   }
 
   .pos-actions {
-    width: 100%;
+    width: auto;
+    flex: 0 0 auto;
+    gap: 7px;
   }
 
-  .pos-estimates-button { padding: 0 9px; font-size: 11px; }
+  .pos-search-box.is-open { width: min(180px, 38vw); }
+  .pos-search-box, .pos-estimates-button { width: 36px; height: 36px; }
+  .pos-search-box button { width: 36px; height: 34px; flex-basis: 36px; }
+  .pos-heading-context { gap: 7px; }
+  .pos-back-button { width: 32px; height: 32px; }
+  .pos-heading-context .eyebrow { font-size: 10px; letter-spacing: .8px; }
 
   .search-box {
     width: 100%;
@@ -5012,4 +5043,11 @@ td strong {
   .pos-service-card small, .pos-service-status { font-size: 11px; }
   .service-table-form { grid-template-columns: 1fr; }
   .service-table-form .primary-button { width: 100%; }
+}
+
+@media (max-width: 600px) {
+  .dashboard-welcome-actions { gap: 7px; }
+  .dashboard-notifications-button { width: 38px; height: 38px; }
+  .dashboard-notification-row { grid-template-columns: 10px minmax(0, 1fr); padding: 12px 14px; }
+  .dashboard-notification-row time { grid-column: 2; }
 }
