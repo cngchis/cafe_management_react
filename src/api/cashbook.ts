@@ -19,6 +19,15 @@ export type CashbookData = {
   totals: { openingVnd: number; incomeVnd: number; expenseVnd: number };
 };
 
+export type BankAccount = {
+  id: string;
+  bankName: string;
+  bankCode: string;
+  accountNumber: string;
+  accountHolder: string;
+  isDefault: boolean;
+};
+
 async function readResponse<T>(response: Response): Promise<T> {
   const body = await response.json().catch(() => null);
   if (!response.ok) throw new Error(body?.error?.message ?? "Không thể tải sổ quỹ.");
@@ -35,4 +44,20 @@ export async function createCashbookEntry(input: { title: string; amountVnd: num
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
   }));
+}
+
+export async function getBankAccounts(): Promise<BankAccount[]> {
+  return (await readResponse<{ accounts: BankAccount[] }>(await fetch("/api/cashbook/bank-accounts"))).accounts;
+}
+
+export async function saveBankAccount(input: Omit<BankAccount, "id" | "isDefault">): Promise<BankAccount> {
+  return readResponse<BankAccount>(await fetch("/api/cashbook/bank-accounts", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  }));
+}
+
+export async function setDefaultBankAccount(id: string): Promise<void> {
+  await readResponse(await fetch(`/api/cashbook/bank-accounts/${id}/default`, { method: "PATCH" }));
 }

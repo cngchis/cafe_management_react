@@ -7,6 +7,7 @@ import { getProducts } from "../api/products";
 import { createOrder } from "../api/orders";
 import { getPriceListTargets, type CustomerTarget } from "../api/moreOperations";
 import { createCustomer } from "../api/customers";
+import { getBankAccounts, type BankAccount } from "../api/cashbook";
 
 type Cart = Record<string, number>;
 
@@ -17,6 +18,7 @@ export function PosPage() {
   const [cartOpen, setCartOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<CustomerTarget[]>([]);
+  const [defaultBankAccount, setDefaultBankAccount] = useState<BankAccount | null>(null);
   const [customerId, setCustomerId] = useState("");
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState("");
@@ -33,7 +35,7 @@ export function PosPage() {
     if (!next) delete updated[id];
     return updated;
   });
-  const completeOrder = async (orderType: "dine_in" | "takeaway" | "delivery", note: string, idempotencyKey: string, payment: { amountReceivedVnd: number; paymentMethod: "cash" | "bank_transfer"; customerName: string; customerId?: string; discountVnd: number }) => {
+  const completeOrder = async (orderType: "dine_in" | "takeaway" | "delivery", note: string, idempotencyKey: string, payment: { amountReceivedVnd: number; paymentMethod: "cash" | "bank_transfer"; customerName: string; customerId?: string; discountVnd: number; transferReference?: string; bankAccountId?: string }) => {
     const order = await createOrder({
       items: cartItems.map(({ id, quantity }) => ({ productId: id, quantity })),
       orderType,
@@ -47,6 +49,7 @@ export function PosPage() {
 
   useEffect(() => {
     getPriceListTargets().then(({ customers: rows }) => setCustomers(rows)).catch(() => undefined);
+    getBankAccounts().then((accounts) => setDefaultBankAccount(accounts.find((item) => item.isDefault) ?? null)).catch(() => setDefaultBankAccount(null));
   }, []);
 
   useEffect(() => {
@@ -60,7 +63,7 @@ export function PosPage() {
   useEffect(() => {
     if (!cartOpen) return;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setCartOpen(false);
+      if (event.key === "Escape" && !document.querySelector(".transfer-qr-layer")) setCartOpen(false);
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
@@ -86,7 +89,7 @@ export function PosPage() {
     </section>
     {createPortal(<>
       <button className="cart-toggle" aria-label={`Giỏ hàng, ${cartCount} món`} aria-controls="cart-panel" aria-expanded={cartOpen} onClick={() => setCartOpen(true)}><Icon name="cart" size={22} /><b className="cart-count">{cartCount}</b></button>
-      {cartOpen && <div className="cart-overlay"><button className="cart-backdrop" type="button" aria-label="Đóng giỏ hàng" onClick={() => setCartOpen(false)} /><CartPanel items={cartItems} customers={customers} customerId={customerId} onCustomerChange={setCustomerId} onCustomerCreated={(customer) => setCustomers((current) => [...current, customer].sort((a, b) => a.name.localeCompare(b.name, "vi")))} onUpdateCart={updateCart} onClearCart={() => setCart({})} onClose={() => setCartOpen(false)} onComplete={completeOrder} /></div>}
+      {cartOpen && <div className="cart-overlay"><button className="cart-backdrop" type="button" aria-label="Đóng giỏ hàng" onClick={() => setCartOpen(false)} /><CartPanel items={cartItems} customers={customers} customerId={customerId} bankAccount={defaultBankAccount} onCustomerChange={setCustomerId} onCustomerCreated={(customer) => setCustomers((current) => [...current, customer].sort((a, b) => a.name.localeCompare(b.name, "vi")))} onUpdateCart={updateCart} onClearCart={() => setCart({})} onClose={() => setCartOpen(false)} onComplete={completeOrder} /></div>}
     </>, document.body)}
   </div>;
 }

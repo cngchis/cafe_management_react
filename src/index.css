@@ -4307,6 +4307,88 @@ td strong {
   gap: 10px;
 }
 
+.bank-account-panel {
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid #edf0f3;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.bank-account-heading,
+.bank-account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.bank-account-heading h3 { margin: 0; font: 700 15px "Manrope", sans-serif; }
+.bank-account-heading p,
+.bank-account-form > p,
+.bank-account-empty { margin: 5px 0 0; color: var(--ink-faint); font-size: 11px; line-height: 1.5; }
+
+.bank-account-form {
+  margin-top: 15px;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  border-radius: 9px;
+  background: #f8f9fb;
+}
+
+.bank-account-form label { display: grid; gap: 5px; }
+.bank-account-form label span { color: var(--ink-soft); font-size: 11px; font-weight: 650; }
+.bank-account-form input { width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: #fff; font: inherit; font-size: 12px; }
+.bank-account-form > p,
+.bank-account-form > button { grid-column: 1 / -1; }
+.bank-account-list { margin-top: 12px; }
+.bank-account-row { padding: 12px 2px; border-top: 1px solid #edf0f3; }
+.bank-account-row > div { min-width: 0; display: grid; gap: 3px; }
+.bank-account-row strong { font-size: 12px; }
+.bank-account-row span,
+.bank-account-row small { color: var(--ink-soft); font-size: 11px; overflow-wrap: anywhere; }
+.bank-default-badge { flex: none; color: #24704d !important; font-weight: 700; }
+.bank-account-error { margin: 10px 0; color: #b42318; font-size: 12px; }
+
+.transfer-qr-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  padding: 20px;
+  display: grid;
+  place-items: center;
+  background: rgba(19, 25, 34, .58);
+}
+
+.transfer-qr-modal {
+  width: min(420px, 100%);
+  max-height: min(92vh, 760px);
+  overflow-y: auto;
+  padding: 20px;
+  border: 1px solid #e9edf2;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, .24);
+}
+
+.transfer-qr-modal h3 { margin: 0; font: 700 17px "Manrope", sans-serif; }
+.transfer-qr-hint { margin: 8px 0 12px; color: var(--ink-soft); font-size: 12px; line-height: 1.5; }
+.transfer-qr-image { display: block; width: min(100%, 280px); aspect-ratio: 1; object-fit: contain; margin: 0 auto 14px; border: 1px solid #edf0f3; border-radius: 10px; }
+.transfer-qr-details { margin: 0; display: grid; gap: 0; }
+.transfer-qr-details > div { padding: 9px 0; display: flex; justify-content: space-between; gap: 14px; border-top: 1px solid #edf0f3; font-size: 12px; }
+.transfer-qr-details dt { color: var(--ink-soft); }
+.transfer-qr-details dd { margin: 0; text-align: right; font-weight: 650; overflow-wrap: anywhere; }
+.transfer-qr-confirm { width: 100%; min-height: 42px; margin-top: 14px; }
+
+@media (max-width: 520px) {
+  .bank-account-heading { align-items: flex-start; }
+  .bank-account-form { grid-template-columns: 1fr; }
+  .bank-account-form > * { grid-column: 1; }
+  .transfer-qr-modal { padding: 16px; }
+}
+
 .cart-item img { width: 56px; height: 56px; }
 .cart-item-main>div:first-child strong { font-size: 12px; }
 .cart-item-main>div:first-child span { font-size: 9px; }

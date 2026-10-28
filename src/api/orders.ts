@@ -7,6 +7,8 @@ export type CreateOrderInput = {
   customerName?: string;
   customerId?: string;
   discountVnd?: number;
+  transferReference?: string;
+  bankAccountId?: string;
 };
 
 export type CreatedOrder = { id: string; orderNumber: string; totalVnd: number; changeVnd?: number; creditVnd?: number };

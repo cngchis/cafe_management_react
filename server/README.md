@@ -10,8 +10,9 @@ Fastify API using TypeScript, Drizzle ORM and PostgreSQL.
 4. Apply `database/migrations/0002_pos_sales.sql` to enable POS order idempotency and sale stock movements.
 5. Apply migrations `0003_inventory_checks.sql` through `0006_work_shifts.sql` in order for inventory history, employee pay rates, and work schedules.
 6. Apply `database/migrations/0007_invoice_cancellations.sql` if it has not already been applied, then apply `database/migrations/0008_morepage_operations.sql`. Migration 0008 adds price lists, purchase receipts, attendance, shift handovers, audit history, and POS customer/credit fields.
-7. Copy `.env.example` to `.env` and set a unique `JWT_SECRET` (at least 32 characters) and `DATABASE_URL`.
-8. Run `npm run dev:api`; the API listens on `http://localhost:3000` by default.
+7. Apply `database/migrations/0009_bank_transfer_qr.sql` to enable receiving bank accounts and POS transfer QR codes.
+8. Copy `.env.example` to `.env` and set a unique `JWT_SECRET` (at least 32 characters) and `DATABASE_URL`.
+9. Run `npm run dev:api`; the API listens on `http://localhost:3000` by default.
 
 The API does not create accounts or seed passwords. Add an account only after choosing an approved password creation flow, storing an Argon2 hash in `password_hash`.
 
@@ -27,6 +28,8 @@ The API does not create accounts or seed passwords. Add an account only after ch
 - `GET /api/orders/:id` (signed-in accounts; order lines and payment summary)
 - `GET /api/dashboard/summary` (signed-in accounts; today, yesterday, seven-day revenue, best sellers, recent completed orders)
 - `POST /api/orders` (signed-in accounts; requires an `Idempotency-Key` UUID header)
+- `GET /api/cashbook/bank-accounts` (signed-in accounts; used by POS)
+- `POST /api/cashbook/bank-accounts` and `PATCH /api/cashbook/bank-accounts/:id/default` (owner/manager only)
 - `/api/employees` (owner-only employee account and hourly pay management)
 - `/api/work-shifts` (owner-only weekly shift scheduling)
 - `/api/payroll` and `/api/payroll/export` (owner-only monthly scheduled-hours payroll and `.xlsx` export)

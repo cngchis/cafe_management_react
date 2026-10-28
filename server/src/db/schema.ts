@@ -253,8 +253,22 @@ export const cashAccounts = pgTable(
     name: text("name").notNull().unique(),
     accountType: text("account_type", { enum: ["cash", "bank"] }).notNull(),
     isActive: boolean("is_active").notNull().default(true),
+    bankName: text("bank_name"),
+    bankCode: text("bank_code"),
+    accountNumber: text("account_number"),
+    accountHolder: text("account_holder"),
+    isDefault: boolean("is_default").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
+  (table) => [
+    uniqueIndex("cash_accounts_default_bank_unique_idx").on(table.isDefault).where(sql`${table.accountType} = 'bank' AND ${table.isDefault}`),
+    uniqueIndex("cash_accounts_bank_identity_unique_idx").on(table.bankCode, table.accountNumber).where(sql`${table.accountType} = 'bank' AND ${table.bankCode} IS NOT NULL AND ${table.accountNumber} IS NOT NULL`),
+    check("cash_accounts_bank_details_check", sql`(
+      ${table.bankCode} IS NULL AND ${table.accountNumber} IS NULL AND ${table.accountHolder} IS NULL AND ${table.bankName} IS NULL AND NOT ${table.isDefault}
+    ) OR (
+      ${table.accountType} = 'bank' AND ${table.bankCode} IS NOT NULL AND ${table.accountNumber} IS NOT NULL AND ${table.accountHolder} IS NOT NULL AND ${table.bankName} IS NOT NULL
+    )`),
+  ],
 );
 
 export const cashbookEntries = pgTable(

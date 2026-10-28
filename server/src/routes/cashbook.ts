@@ -1,12 +1,92 @@
 import type { FastifyPluginAsync } from "fastify";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { cashAccounts, cashbookEntries } from "../db/schema.js";
 import { getSessionAccount } from "../auth/session.js";
 
 type EntryBody = { title: string; amountVnd: number; direction: "in" | "out" };
+type BankAccountBody = { bankName: string; bankCode: string; accountNumber: string; accountHolder: string };
+
+const canManageBankAccounts = (role: string) => role === "owner" || role === "manager";
 
 export const cashbookRoutes: FastifyPluginAsync = async (app) => {
+  app.get("/cashbook/bank-accounts", async (request, reply) => {
+    const account = await getSessionAccount(request);
+    if (!account) return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lòng đăng nhập." } });
+    const accounts = await db.select({
+      id: cashAccounts.id,
+      bankName: cashAccounts.bankName,
+      bankCode: cashAccounts.bankCode,
+      accountNumber: cashAccounts.accountNumber,
+      accountHolder: cashAccounts.accountHolder,
+      isDefault: cashAccounts.isDefault,
+    }).from(cashAccounts).where(and(eq(cashAccounts.accountType, "bank"), eq(cashAccounts.isActive, true)))
+      .orderBy(desc(cashAccounts.isDefault), desc(cashAccounts.createdAt));
+    return { accounts: accounts.filter((row) => row.bankName && row.bankCode && row.accountNumber && row.accountHolder) };
+  });
+
+  app.post<{ Body: BankAccountBody }>("/cashbook/bank-accounts", {
+    schema: {
+      body: {
+        type: "object", additionalProperties: false,
+        required: ["bankName", "bankCode", "accountNumber", "accountHolder"],
+        properties: {
+          bankName: { type: "string", minLength: 1, maxLength: 100 },
+          bankCode: { type: "string", minLength: 2, maxLength: 20 },
+          accountNumber: { type: "string", minLength: 4, maxLength: 32 },
+          accountHolder: { type: "string", minLength: 1, maxLength: 100 },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const account = await getSessionAccount(request);
+    if (!account) return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lòng đăng nhập." } });
+    if (!canManageBankAccounts(account.role)) return reply.code(403).send({ error: { code: "FORBIDDEN", message: "Bạn không có quyền quản lý tài khoản ngân hàng." } });
+    const bankName = request.body.bankName.trim();
+    const bankCode = request.body.bankCode.trim().toUpperCase();
+    const accountNumber = request.body.accountNumber.trim();
+    const accountHolder = request.body.accountHolder.trim().toUpperCase();
+    if (!bankName || !bankCode || !accountNumber || !accountHolder) {
+      return reply.code(400).send({ error: { code: "INVALID_BANK_ACCOUNT", message: "Vui lòng nhập đầy đủ thông tin ngân hàng." } });
+    }
+    const saved = await db.transaction(async (tx) => {
+      await tx.update(cashAccounts).set({ isDefault: false }).where(and(eq(cashAccounts.accountType, "bank"), eq(cashAccounts.isDefault, true)));
+      const [existing] = await tx.select({ id: cashAccounts.id }).from(cashAccounts)
+        .where(and(eq(cashAccounts.bankCode, bankCode), eq(cashAccounts.accountNumber, accountNumber))).limit(1);
+      if (existing) {
+        const [updated] = await tx.update(cashAccounts).set({
+          name: `${bankName} · ${accountNumber}`, bankName, bankCode, accountNumber, accountHolder, isDefault: true, isActive: true,
+        }).where(eq(cashAccounts.id, existing.id)).returning({ id: cashAccounts.id });
+        return updated;
+      }
+      const [created] = await tx.insert(cashAccounts).values({
+        name: `${bankName} · ${accountNumber}`, accountType: "bank", bankName, bankCode, accountNumber, accountHolder, isDefault: true,
+      }).returning({ id: cashAccounts.id });
+      return created;
+    });
+    const [result] = await db.select({
+      id: cashAccounts.id, bankName: cashAccounts.bankName, bankCode: cashAccounts.bankCode,
+      accountNumber: cashAccounts.accountNumber, accountHolder: cashAccounts.accountHolder, isDefault: cashAccounts.isDefault,
+    }).from(cashAccounts).where(eq(cashAccounts.id, saved.id)).limit(1);
+    return reply.code(201).send(result);
+  });
+
+  app.patch<{ Params: { id: string } }>("/cashbook/bank-accounts/:id/default", async (request, reply) => {
+    const account = await getSessionAccount(request);
+    if (!account) return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lòng đăng nhập." } });
+    if (!canManageBankAccounts(account.role)) return reply.code(403).send({ error: { code: "FORBIDDEN", message: "Bạn không có quyền quản lý tài khoản ngân hàng." } });
+    const result = await db.transaction(async (tx) => {
+      const [selected] = await tx.select({ id: cashAccounts.id }).from(cashAccounts)
+        .where(and(eq(cashAccounts.id, request.params.id), eq(cashAccounts.accountType, "bank"), eq(cashAccounts.isActive, true))).limit(1);
+      if (!selected) return false;
+      await tx.update(cashAccounts).set({ isDefault: false }).where(and(eq(cashAccounts.accountType, "bank"), eq(cashAccounts.isDefault, true)));
+      await tx.update(cashAccounts).set({ isDefault: true }).where(eq(cashAccounts.id, selected.id));
+      return true;
+    });
+    if (!result) return reply.code(404).send({ error: { code: "BANK_ACCOUNT_NOT_FOUND", message: "Không tìm thấy tài khoản ngân hàng." } });
+    return { ok: true };
+  });
+
   app.get<{ Querystring: { account?: "cash" | "bank" | "all" } }>("/cashbook", async (request, reply) => {
     const sessionAccount = await getSessionAccount(request);
     if (!sessionAccount) return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lòng đăng nhập." } });

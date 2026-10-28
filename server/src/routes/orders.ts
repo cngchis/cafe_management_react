@@ -30,6 +30,8 @@ const bodySchema = {
     customerName: { type: "string", maxLength: 200 },
     customerId: { type: "string", format: "uuid" },
     discountVnd: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+    transferReference: { type: "string", minLength: 4, maxLength: 30 },
+    bankAccountId: { type: "string", format: "uuid" },
   },
 } as const;
 
@@ -42,6 +44,8 @@ type CreateOrderBody = {
   customerName?: string;
   customerId?: string;
   discountVnd?: number;
+  transferReference?: string;
+  bankAccountId?: string;
 };
 
 export const orderRoutes: FastifyPluginAsync = async (app) => {
@@ -294,6 +298,22 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
       const paidAmount = Math.min(tendered, Number(total));
       const creditAmount = Number(total) - paidAmount;
       const paymentMethod = request.body.paymentMethod ?? "cash";
+      let bankCashAccountId: string | null = null;
+      if (paymentMethod === "bank_transfer") {
+        if (Number(total) <= 0) {
+          throw Object.assign(new Error("Đơn hàng không có số tiền cần thanh toán bằng chuyển khoản."), { statusCode: 422, code: "ZERO_TOTAL_BANK_TRANSFER" });
+        }
+        if (tendered !== Number(total)) {
+          throw Object.assign(new Error("Chuyển khoản cần thanh toán đúng số tiền trên QR."), { statusCode: 422, code: "INVALID_BANK_TRANSFER_AMOUNT" });
+        }
+        if (!request.body.transferReference?.trim() || !request.body.bankAccountId) {
+          throw Object.assign(new Error("Thông tin tài khoản hoặc mã tham chiếu QR không hợp lệ."), { statusCode: 422, code: "INVALID_BANK_TRANSFER_QR" });
+        }
+        const [bankAccount] = await tx.select({ id: cashAccounts.id }).from(cashAccounts)
+          .where(and(eq(cashAccounts.id, request.body.bankAccountId), eq(cashAccounts.accountType, "bank"), eq(cashAccounts.isActive, true))).limit(1);
+        if (!bankAccount) throw Object.assign(new Error("Chưa thiết lập tài khoản ngân hàng nhận tiền."), { statusCode: 409, code: "BANK_ACCOUNT_NOT_CONFIGURED" });
+        bankCashAccountId = bankAccount.id;
+      }
       const selectedCustomerName = request.body.customerName?.trim() || customer?.name || "";
       const [openHandover] = await tx.select({ id: shiftHandoverSheets.id })
         .from(shiftHandoverSheets).where(and(eq(shiftHandoverSheets.employeeId, account.id), sql`${shiftHandoverSheets.closedAt} IS NULL`)).limit(1);
@@ -323,16 +343,20 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
 
       await tx.insert(orderItems).values(discountedLineItems.map((item) => ({ ...item, orderId: created.id })));
       if (paidAmount > 0) {
-        const [payment] = await tx.insert(payments).values({ orderId: created.id, amountVnd: paidAmount, method: paymentMethod, status: "completed" }).returning({ id: payments.id });
-        const cashAccountName = paymentMethod === "cash" ? "Tiền mặt" : "Chuyển khoản";
-        await tx.insert(cashAccounts).values({ name: cashAccountName, accountType: paymentMethod === "cash" ? "cash" : "bank" }).onConflictDoNothing();
-        const [cashAccount] = await tx.select({ id: cashAccounts.id }).from(cashAccounts)
-          .where(eq(cashAccounts.name, cashAccountName)).limit(1);
+        const [payment] = await tx.insert(payments).values({
+          orderId: created.id, amountVnd: paidAmount, method: paymentMethod, status: "completed",
+          externalReference: paymentMethod === "bank_transfer" ? request.body.transferReference?.trim() : null,
+        }).returning({ id: payments.id });
+        const cashAccountName = "Tiền mặt";
+        if (paymentMethod === "cash") await tx.insert(cashAccounts).values({ name: cashAccountName, accountType: "cash" }).onConflictDoNothing();
+        const [cashAccount] = bankCashAccountId
+          ? await tx.select({ id: cashAccounts.id }).from(cashAccounts).where(eq(cashAccounts.id, bankCashAccountId)).limit(1)
+          : await tx.select({ id: cashAccounts.id }).from(cashAccounts).where(eq(cashAccounts.name, cashAccountName)).limit(1);
         await tx.insert(cashbookEntries).values({
           cashAccountId: cashAccount.id, paymentId: payment.id, referenceCode: `TH${orderNumber}`,
           direction: "in", title: "Thu tiền khách trả", category: "Thu tiền bán hàng",
           counterpartyGroup: "Khách hàng", counterpartyName: selectedCustomerName || "Khách hàng",
-          description: `Phiếu thu tự động cho hóa đơn ${orderNumber}`, amountVnd: paidAmount,
+          description: `Phiếu thu tự động cho hóa đơn ${orderNumber}${request.body.transferReference ? ` · ${request.body.transferReference}` : ""}`, amountVnd: paidAmount,
           createdByName: account.displayName,
         });
       }
