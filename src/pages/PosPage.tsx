@@ -20,6 +20,7 @@ export function PosPage() {
   const [query, setQuery] = useState("");
   const [cart, setCart] = useState<Cart>({});
   const [cartOpen, setCartOpen] = useState(false);
+  const [successNotice, setSuccessNotice] = useState<{ title: string; detail: string } | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<CustomerTarget[]>([]);
   const [defaultBankAccount, setDefaultBankAccount] = useState<BankAccount | null>(null);
@@ -54,18 +55,29 @@ export function PosPage() {
       ...payment,
     }, idempotencyKey);
     setCart({});
+    setCartOpen(false);
+    setSuccessNotice({ title: payment.mode === "estimate" ? "Đã lưu hóa đơn tạm tính" : "Thanh toán thành công", detail: `Đơn ${order.orderNumber} đã được lưu.` });
     void getProducts().then(setProducts).catch(() => undefined);
     return order.orderNumber;
   };
 
   const settleEstimate = async (id: string, input: { amountReceivedVnd: number; paymentMethod: "cash" | "bank_transfer"; transferReference?: string; bankAccountId?: string }, idempotencyKey: string) => {
     const orderNumber = await payOrder(id, input, idempotencyKey);
-    navigate("/invoices");
+    setCartOpen(false);
+    navigate("/pos");
+    setSuccessNotice({ title: "Thanh toán thành công", detail: `Đơn ${orderNumber} đã được thanh toán.` });
     return orderNumber;
   };
 
+  useEffect(() => {
+    if (!successNotice) return;
+    const timeout = window.setTimeout(() => setSuccessNotice(null), 900);
+    return () => window.clearTimeout(timeout);
+  }, [successNotice]);
+
   const deleteEstimate = async (id: string) => {
     await cancelOrder(id);
+    setCartOpen(false);
     navigate("/pos");
   };
 
@@ -155,6 +167,7 @@ export function PosPage() {
     </div>, document.body)}
     {createPortal(<>
       <button className="cart-toggle" aria-label={`Giỏ hàng, ${cartCount} món`} aria-controls="cart-panel" aria-expanded={cartOpen} onClick={() => setCartOpen(true)}><Icon name="cart" size={22} /><b className="cart-count">{cartCount}</b></button>
+      {successNotice && <div key={`${successNotice.title}-${successNotice.detail}`} className="pos-success-notice" role="status" aria-live="polite"><span className="pos-success-icon"><Icon name="check" size={22} /></span><span><strong>{successNotice.title}</strong><small>{successNotice.detail}</small></span></div>}
       {(cartOpen || Boolean(estimateId)) && <div className="cart-overlay">{!estimateId && <button className="cart-backdrop" type="button" aria-label="Đóng giỏ hàng" onClick={() => setCartOpen(false)} />}<CartPanel items={estimateId ? [] : cartItems} customers={customers} customerId={customerId} bankAccount={defaultBankAccount} estimate={estimate} estimateLoading={estimateLoading} estimateError={estimateError} onCustomerChange={setCustomerId} onCustomerCreated={(customer) => setCustomers((current) => [...current, customer].sort((a, b) => a.name.localeCompare(b.name, "vi")))} onUpdateCart={updateCart} onClearCart={() => setCart({})} onClose={() => { if (estimateId) { setCartOpen(false); navigate("/pos"); } else setCartOpen(false); }} onComplete={completeOrder} onPayEstimate={settleEstimate} onDeleteEstimate={deleteEstimate} /></div>}
     </>, document.body)}
   </div>;
