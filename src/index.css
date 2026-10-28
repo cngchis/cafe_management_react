@@ -582,6 +582,7 @@ input:focus-visible {
   background: #fff;
   color: var(--ink-soft);
   font-size: 9.5px;
+  cursor: pointer;
 }
 
 .text-button {
@@ -783,6 +784,7 @@ td strong {
   border-radius: 7px;
   background: #fff;
   color: var(--ink-faint);
+  cursor: pointer;
 }
 
 .management-welcome {
