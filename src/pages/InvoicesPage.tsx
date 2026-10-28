@@ -98,7 +98,7 @@ function matchesPeriod(orderedAt: string, period: string, dateFrom: string, date
 
 export function InvoicesPage({ role }: { role: Account["role"] }) {
   const navigate = useNavigate();
-  const [period, setPeriod] = useState("Toàn thời gian");
+  const [period, setPeriod] = useState("Hôm nay");
   const [dateFrom, setDateFrom] = useState(() => toLocalDateValue(new Date()));
   const [dateTo, setDateTo] = useState(() => toLocalDateValue(new Date()));
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
