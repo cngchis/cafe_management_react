@@ -6,7 +6,7 @@ import { InvoiceDetail, type Invoice } from "../components/InvoiceDetail";
 import { cancelOrder, getOrder, getOrders, type OrderDetailRecord, type OrderRecord } from "../api/orders";
 
 const periods = ["Hôm nay", "Hôm qua", "Tuần này", "Tháng này"];
-const branches = ["Tất cả chi nhánh", "Chi nhánh trung tâm"];
+const hours = Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, "0")}:00`);
 const formatAmount = (amount: number) => amount.toLocaleString("en-US");
 
 function displayOrderType(order: OrderRecord) {
@@ -82,7 +82,9 @@ function matchesPeriod(orderedAt: string, period: string) {
 export function InvoicesPage({ role }: { role: Account["role"] }) {
   const navigate = useNavigate();
   const [period, setPeriod] = useState("Hôm nay");
-  const [branch, setBranch] = useState(branches[0]);
+  const [startHour, setStartHour] = useState(0);
+  const [endHour, setEndHour] = useState(23);
+  const [isHourPickerOpen, setIsHourPickerOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [sortDescending, setSortDescending] = useState(true);
@@ -140,6 +142,12 @@ export function InvoicesPage({ role }: { role: Account["role"] }) {
 
   const visibleInvoices = invoices
     .filter((invoice) => matchesPeriod(invoice.orderedAt, period))
+    .filter((invoice) => {
+      const hour = new Date(invoice.orderedAt).getHours();
+      return startHour <= endHour
+        ? hour >= startHour && hour <= endHour
+        : hour >= startHour || hour <= endHour;
+    })
     .filter((invoice) => invoice.id.toLowerCase().includes(query.toLowerCase()) || invoice.customer.toLowerCase().includes(query.toLowerCase()))
     .slice()
     .sort((first, second) => (sortDescending ? -1 : 1) * first.orderedAt.localeCompare(second.orderedAt));
@@ -167,7 +175,16 @@ export function InvoicesPage({ role }: { role: Account["role"] }) {
     {searchOpen && <label className="menu-search"><Icon name="search" size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm mã hóa đơn..." /><button type="button" aria-label="Đóng tìm kiếm" onClick={() => { setSearchOpen(false); setQuery(""); }}><Icon name="close" size={17} /></button></label>}
     <div className="invoice-filters">
       <label className="cashbook-select"><Icon name="filter" size={17} /><select value={period} onChange={(event) => setPeriod(event.target.value)}>{periods.map((item) => <option key={item}>{item}</option>)}</select><Icon name="chevron" size={15} /></label>
-      <label className="cashbook-select"><select value={branch} onChange={(event) => setBranch(event.target.value)}>{branches.map((item) => <option key={item}>{item}</option>)}</select><Icon name="chevron" size={15} /></label>
+      <div className="invoice-hour-filter">
+        <button type="button" className="cashbook-select invoice-hour-trigger" aria-expanded={isHourPickerOpen} onClick={() => setIsHourPickerOpen((open) => !open)}>
+          <span>{startHour === 0 && endHour === 23 ? "Tất cả khung giờ" : `${startHour}h–${endHour}h`}</span><Icon name="chevron" size={15} />
+        </button>
+        {isHourPickerOpen && <div className="invoice-hour-popover" role="group" aria-label="Chọn khung giờ">
+          <label><span>Từ</span><select aria-label="Giờ bắt đầu" value={startHour} onChange={(event) => setStartHour(Number(event.target.value))}>{hours.map((item, index) => <option key={index} value={index}>{item}</option>)}</select></label>
+          <label><span>Đến</span><select aria-label="Giờ kết thúc" value={endHour} onChange={(event) => setEndHour(Number(event.target.value))}>{hours.map((item, index) => <option key={index} value={index}>{item}</option>)}</select></label>
+          <button type="button" className="primary-button" onClick={() => setIsHourPickerOpen(false)}>Áp dụng</button>
+        </div>}
+      </div>
     </div>
     <section className="invoice-summary">
       <div><button className="invoice-summary-label">Tổng thanh toán <Icon name="chevron" size={15} /></button><span>{visibleInvoices.length} hóa đơn</span></div>

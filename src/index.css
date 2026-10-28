@@ -2429,6 +2429,49 @@ td strong {
   width: fit-content;
 }
 
+.invoice-hour-filter {
+  position: relative;
+}
+
+.invoice-hour-trigger {
+  width: fit-content;
+  cursor: pointer;
+  font: inherit;
+}
+
+.invoice-hour-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  min-width: 220px;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgb(20 30 45 / 14%);
+}
+
+.invoice-hour-popover label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.invoice-hour-popover select {
+  min-width: 82px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ink);
+}
+
 .invoice-summary {
   min-height: 82px;
   padding: 12px 18px;
