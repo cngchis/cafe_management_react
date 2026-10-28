@@ -4056,6 +4056,7 @@ td strong {
 }
 
 .cart-submit-actions { display: grid; grid-template-columns: minmax(88px, .7fr) minmax(0, 1.3fr); gap: 8px; padding: 0 18px 16px; }
+.cart-submit-actions.is-estimate { grid-template-columns: minmax(0, 1fr); }
 .cart-submit-actions .pay-button { margin: 0; }
 .estimate-button { min-height: 48px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .estimate-button:disabled { opacity: .55; cursor: not-allowed; }
