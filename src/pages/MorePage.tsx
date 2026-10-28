@@ -16,7 +16,7 @@ const groups: { title: string; layout: "tiles" | "list"; items: MoreItem[] }[] =
     layout: "tiles",
     items: [
       { label: "Món", icon: "coffee", path: "/menu", roles: ["owner", "manager"] },
-      { label: "Thiết lập giá", icon: "settings", path: "/price-lists", roles: ["owner", "manager"] }
+      { label: "Thiết lập giá", icon: "tag", path: "/price-lists", roles: ["owner", "manager"] }
     ],
   },
   {
@@ -37,9 +37,9 @@ const groups: { title: string; layout: "tiles" | "list"; items: MoreItem[] }[] =
     title: "Kho hàng",
     layout: "tiles",
     items: [
-      { label: "Kho hàng", icon: "check", path: "/inventory", roles: ["owner", "manager"] },
+      { label: "Kho hàng", icon: "package", path: "/inventory", roles: ["owner", "manager"] },
       { label: "Kiểm kho", icon: "check", path: "/inventory-check", roles: ["owner", "manager"] },
-      { label: "Nhập hàng", icon: "plus", path: "/purchases", roles: ["owner", "manager"] }
+      { label: "Nhập hàng", icon: "cart", path: "/purchases", roles: ["owner", "manager"] }
     ],
   },
   {
@@ -51,11 +51,11 @@ const groups: { title: string; layout: "tiles" | "list"; items: MoreItem[] }[] =
     title: "Nhân viên",
     layout: "tiles",
     items: [
-      { label: "Nhân viên", icon: "users", path: "/employees", roles: ["owner"] },
-      { label: "Lịch làm việc", icon: "clock", path: "/work-schedule", roles: ["owner", "manager", "cashier"] },
-      { label: "Bảng lương", icon: "calendar", path: "/payroll", roles: ["owner"] },
+      { label: "Nhân viên", icon: "user", path: "/employees", roles: ["owner"] },
+      { label: "Lịch làm việc", icon: "calendar", path: "/work-schedule", roles: ["owner", "manager", "cashier"] },
+      { label: "Bảng lương", icon: "coins", path: "/payroll", roles: ["owner"] },
       { label: "Chấm công", icon: "clock", path: "/attendance", roles: ["owner", "manager", "cashier"] },
-      { label: "phiếu giao ca", icon: "clock", path: "/shift-handovers", roles: ["owner", "manager", "cashier"] }
+      { label: "phiếu giao ca", icon: "handover", path: "/shift-handovers", roles: ["owner", "manager", "cashier"] }
     ],
   },
   {
@@ -69,8 +69,8 @@ const groups: { title: string; layout: "tiles" | "list"; items: MoreItem[] }[] =
     title: "Báo cáo",
     layout: "tiles",
     items: [
-      { label: "Phân tích", icon: "chart", path: "/reports/analysis", roles: ["owner", "manager"] },
-      { label: "Cuối ngày", icon: "calendar", path: "/reports/daily", roles: ["owner", "manager", "cashier"] },
+      { label: "Phân tích", icon: "trend", path: "/reports/analysis", roles: ["owner", "manager"] },
+      { label: "Cuối ngày", icon: "clipboard", path: "/reports/daily", roles: ["owner", "manager", "cashier"] },
       { label: "Hàng hóa", icon: "box", path: "/reports/products", roles: ["owner", "manager"] },
       { label: "Bán hàng", icon: "chart", path: "/reports/sales", roles: ["owner", "manager"] },
     ],

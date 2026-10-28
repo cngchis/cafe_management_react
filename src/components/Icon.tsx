@@ -25,7 +25,15 @@ export type IconName =
   | "menu"
   | "close"
   | "logout"
-  | "filter";
+  | "filter"
+  | "chair"
+  | "history"
+  | "tag"
+  | "user"
+  | "coins"
+  | "handover"
+  | "package"
+  | "clipboard";
 
 const iconPaths: Record<IconName, React.ReactNode> = {
   grid: <><rect x="3" y="3" width="7" height="7" rx="2" /><rect x="14" y="3" width="7" height="7" rx="2" /><rect x="3" y="14" width="7" height="7" rx="2" /><rect x="14" y="14" width="7" height="7" rx="2" /></>,
@@ -55,6 +63,14 @@ const iconPaths: Record<IconName, React.ReactNode> = {
   close: <path d="m6 6 12 12M18 6 6 18" />,
   logout: <><path d="M10 17l5-5-5-5M15 12H3" /><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" /></>,
   filter: <path d="M4 5h16M7 12h10M10 19h4" />,
+  chair: <><path d="M6 11V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v6" /><path d="M5 11h14a2 2 0 0 1 2 2v2H3v-2a2 2 0 0 1 2-2ZM5 15v6M19 15v6" /></>,
+  history: <><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8" /><path d="M3 3v5h5M12 7v5l3 2" /></>,
+  tag: <><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z" /><circle cx="7.5" cy="7.5" r="1" /></>,
+  user: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
+  coins: <><circle cx="8" cy="8" r="5" /><path d="M8 5v6M6 7h4M14 6a5 5 0 1 1-2 9M16 13v6M14 15h4" /></>,
+  handover: <><path d="M4 8h14l-3-3M20 16H6l3 3" /><path d="M18 8v4M6 12v4" /></>,
+  package: <><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 8 9 5 9-5M3 8v8l9 5 9-5V8M12 13v8" /><path d="m8 5 9 5" /></>,
+  clipboard: <><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3" /></>,
 };
 
 export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
