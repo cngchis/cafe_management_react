@@ -38,11 +38,12 @@ type InvoiceDetailProps = {
   onBack: () => void;
   canCancel: boolean;
   onCancel: (id: string) => Promise<void>;
+  onResume: (id: string) => void;
 };
 
 const formatAmount = (amount: number) => amount.toLocaleString("en-US");
 
-export function InvoiceDetail({ invoice, onBack, canCancel, onCancel }: InvoiceDetailProps) {
+export function InvoiceDetail({ invoice, onBack, canCancel, onCancel, onResume }: InvoiceDetailProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -98,6 +99,7 @@ export function InvoiceDetail({ invoice, onBack, canCancel, onCancel }: InvoiceD
     </nav>
     <section className="invoice-detail-card invoice-detail-header">
       <div className="invoice-detail-heading"><div><h2>{invoice.id}</h2><time>{invoice.date} {invoice.time}</time></div><span className={`invoice-paid${invoice.status === "Đã hủy" ? " cancelled" : ""}`}>{invoice.status}</span></div>
+      {invoice.status === "Chờ thanh toán" && <button className="primary-button invoice-resume" type="button" onClick={() => onResume(invoice.recordId)}>Mở POS để thanh toán</button>}
     </section>
     <section className="invoice-detail-card invoice-customer">
       <span className="invoice-customer-icon"><Icon name="users" size={24} /></span><strong>{invoice.customer}</strong>

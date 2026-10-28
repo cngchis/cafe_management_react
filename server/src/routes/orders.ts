@@ -24,6 +24,7 @@ const bodySchema = {
       },
     },
     orderType: { type: "string", enum: ["dine_in", "takeaway", "delivery"] },
+    mode: { type: "string", enum: ["payment", "estimate"] },
     note: { type: "string", maxLength: 2000 },
     amountReceivedVnd: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
     paymentMethod: { type: "string", enum: ["cash", "bank_transfer"] },
@@ -38,6 +39,7 @@ const bodySchema = {
 type CreateOrderBody = {
   items: Array<{ productId: string; quantity: number }>;
   orderType: "dine_in" | "takeaway" | "delivery";
+  mode?: "payment" | "estimate";
   note?: string;
   amountReceivedVnd?: number;
   paymentMethod?: "cash" | "bank_transfer";
@@ -72,7 +74,7 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
       paidAmountVnd: sql<number>`coalesce(sum(case when ${payments.status} = 'completed' then ${payments.amountVnd} else 0 end), 0)`.mapWith(Number),
     }).from(orders)
       .leftJoin(payments, eq(payments.orderId, orders.id))
-      .where(inArray(orders.status, ["completed", "cancelled"]))
+      .where(inArray(orders.status, ["awaiting_payment", "completed", "cancelled"]))
       .groupBy(orders.id)
       .orderBy(desc(orders.orderedAt))
       .limit(100);
@@ -108,6 +110,7 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
 
     const items = await db.select({
       name: orderItems.productNameSnapshot,
+      productId: orderItems.productId,
       portion: orderItems.portionSnapshot,
       note: orderItems.note,
       quantity: orderItems.quantity,
@@ -128,6 +131,98 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
     } };
   });
 
+  app.post<{ Params: { id: string }; Body: { amountReceivedVnd?: number; paymentMethod?: "cash" | "bank_transfer"; transferReference?: string; bankAccountId?: string }; Headers: { "idempotency-key"?: string } }>("/orders/:id/pay", {
+    schema: {
+      headers: { type: "object", properties: { "idempotency-key": { type: "string", format: "uuid" } } },
+      params: { type: "object", required: ["id"], properties: { id: { type: "string", format: "uuid" } } },
+      body: {
+        type: "object", additionalProperties: false,
+        properties: {
+          amountReceivedVnd: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+          paymentMethod: { type: "string", enum: ["cash", "bank_transfer"] },
+          transferReference: { type: "string", minLength: 4, maxLength: 30 },
+          bankAccountId: { type: "string", format: "uuid" },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const account = await getSessionAccount(request);
+    if (!account) return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lòng đăng nhập." } });
+    const idempotencyKey = request.headers["idempotency-key"];
+    if (!idempotencyKey) return reply.code(400).send({ error: { code: "IDEMPOTENCY_KEY_REQUIRED", message: "Thiếu mã yêu cầu thanh toán." } });
+
+    const result = await db.transaction(async (tx) => {
+      const [order] = await tx.select({ id: orders.id, orderNumber: orders.orderNumber, status: orders.status, totalVnd: orders.totalVnd })
+        .from(orders).where(eq(orders.id, request.params.id)).for("update").limit(1);
+      if (!order) throw Object.assign(new Error("Không tìm thấy đơn tạm tính."), { statusCode: 404, code: "ORDER_NOT_FOUND" });
+      if (order.status === "completed") return { orderNumber: order.orderNumber };
+      if (order.status !== "awaiting_payment") throw Object.assign(new Error("Đơn này không ở trạng thái chờ thanh toán."), { statusCode: 409, code: "ORDER_NOT_PAYABLE" });
+
+      const paymentMethod = request.body.paymentMethod ?? "cash";
+      const tendered = request.body.amountReceivedVnd ?? order.totalVnd;
+      if (!Number.isSafeInteger(tendered) || tendered < order.totalVnd) {
+        throw Object.assign(new Error("Số tiền nhận phải bằng hoặc lớn hơn số tiền đơn hàng."), { statusCode: 422, code: "INVALID_TENDER" });
+      }
+      let cashAccountId: string;
+      if (paymentMethod === "bank_transfer") {
+        if (order.totalVnd <= 0 || tendered !== order.totalVnd || !request.body.transferReference?.trim() || !request.body.bankAccountId) {
+          throw Object.assign(new Error("Chuyển khoản cần thanh toán đúng số tiền trên QR."), { statusCode: 422, code: "INVALID_BANK_TRANSFER_QR" });
+        }
+        const [bankAccount] = await tx.select({ id: cashAccounts.id }).from(cashAccounts)
+          .where(and(eq(cashAccounts.id, request.body.bankAccountId), eq(cashAccounts.accountType, "bank"), eq(cashAccounts.isActive, true))).limit(1);
+        if (!bankAccount) throw Object.assign(new Error("Tài khoản ngân hàng nhận tiền không còn hoạt động."), { statusCode: 409, code: "BANK_ACCOUNT_NOT_CONFIGURED" });
+        cashAccountId = bankAccount.id;
+      } else {
+        await tx.insert(cashAccounts).values({ name: "Tiền mặt", accountType: "cash" }).onConflictDoNothing();
+        const [cashAccount] = await tx.select({ id: cashAccounts.id }).from(cashAccounts).where(eq(cashAccounts.name, "Tiền mặt")).limit(1);
+        cashAccountId = cashAccount.id;
+      }
+
+      const soldItems = await tx.select({ productId: orderItems.productId, quantity: orderItems.quantity })
+        .from(orderItems).where(eq(orderItems.orderId, order.id));
+      const productIds = [...new Set(soldItems.flatMap((item) => item.productId ? [item.productId] : []))].sort();
+      const lockedProducts = productIds.length ? await tx.select({ id: products.id, isActive: products.isActive })
+        .from(products).where(inArray(products.id, productIds)).orderBy(products.id).for("update") : [];
+      if (lockedProducts.length !== productIds.length || lockedProducts.some((product) => !product.isActive)) {
+        throw Object.assign(new Error("Một hoặc nhiều món trong đơn không còn khả dụng."), { statusCode: 409, code: "PRODUCT_UNAVAILABLE" });
+      }
+      const stockRows = productIds.length ? await tx.select({
+        productId: inventoryMovements.productId,
+        stock: sql<number>`coalesce(sum(${inventoryMovements.quantityDelta}), 0)`.mapWith(Number),
+      }).from(inventoryMovements).where(inArray(inventoryMovements.productId, productIds)).groupBy(inventoryMovements.productId) : [];
+      const stockByProduct = new Map(stockRows.map((row) => [row.productId, row.stock]));
+      for (const item of soldItems) if (item.productId && (stockByProduct.get(item.productId) ?? 0) < item.quantity) {
+        throw Object.assign(new Error("Tồn kho không đủ để thanh toán đơn tạm tính."), { statusCode: 409, code: "INSUFFICIENT_STOCK" });
+      }
+
+      const now = new Date();
+      if (order.totalVnd > 0) {
+        const [payment] = await tx.insert(payments).values({
+          orderId: order.id, amountVnd: order.totalVnd, method: paymentMethod, status: "completed",
+          externalReference: paymentMethod === "bank_transfer" ? request.body.transferReference?.trim() : idempotencyKey,
+        }).returning({ id: payments.id });
+        await tx.insert(cashbookEntries).values({
+          cashAccountId, paymentId: payment.id, referenceCode: `TH${order.orderNumber}`,
+          direction: "in", title: "Thu tiền khách trả", category: "Thu tiền bán hàng",
+          counterpartyGroup: "Khách hàng", counterpartyName: "Khách hàng",
+          description: `Thanh toán đơn tạm tính ${order.orderNumber}${request.body.transferReference ? ` · ${request.body.transferReference}` : ""}`,
+          amountVnd: order.totalVnd, createdByName: account.displayName, occurredAt: now,
+        });
+      }
+      const restockItems = soldItems.filter((item): item is { productId: string; quantity: number } => item.productId !== null);
+      if (restockItems.length) await tx.insert(inventoryMovements).values(restockItems.map((item) => ({
+        productId: item.productId, quantityDelta: -item.quantity, reason: "sale" as const,
+        note: `Bán hàng ${order.orderNumber}`, createdByName: account.displayName, occurredAt: now,
+      })));
+      await tx.update(orders).set({
+        status: "completed", amountTenderedVnd: tendered, changeVnd: tendered - order.totalVnd, closedAt: now, updatedAt: now,
+      }).where(eq(orders.id, order.id));
+      await tx.insert(auditLogs).values({ accountId: account.id, actorName: account.displayName, action: "paid", entityType: "order", entityId: order.id, summary: `Thanh toán đơn tạm tính ${order.orderNumber}.` });
+      return { orderNumber: order.orderNumber };
+    });
+    return { order: result };
+  });
+
   app.post<{ Params: { id: string } }>("/orders/:id/cancel", {
     schema: {
       params: { type: "object", required: ["id"], properties: { id: { type: "string", format: "uuid" } } },
@@ -135,15 +230,23 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
   }, async (request, reply) => {
     const account = await getSessionAccount(request);
     if (!account) return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lòng đăng nhập." } });
-    if (account.role === "cashier") return reply.code(403).send({ error: { code: "FORBIDDEN", message: "Bạn không có quyền hủy hóa đơn." } });
-
     const result = await db.transaction(async (tx) => {
       const [order] = await tx.select({
         id: orders.id,
         orderNumber: orders.orderNumber,
         status: orders.status,
+        cashierAccountId: orders.cashierAccountId,
       }).from(orders).where(eq(orders.id, request.params.id)).for("update").limit(1);
       if (!order) throw Object.assign(new Error("Không tìm thấy hóa đơn."), { statusCode: 404, code: "ORDER_NOT_FOUND" });
+      if (account.role === "cashier" && !(order.status === "awaiting_payment" && order.cashierAccountId === account.id)) {
+        throw Object.assign(new Error("Bạn không có quyền hủy hóa đơn này."), { statusCode: 403, code: "FORBIDDEN" });
+      }
+      if (order.status === "awaiting_payment") {
+        const now = new Date();
+        await tx.update(orders).set({ status: "cancelled", closedAt: now, updatedAt: now }).where(eq(orders.id, order.id));
+        await tx.insert(auditLogs).values({ accountId: account.id, actorName: account.displayName, action: "cancelled", entityType: "order", entityId: order.id, summary: `Xóa đơn tạm tính ${order.orderNumber}.` });
+        return { id: order.id, status: "cancelled" as const };
+      }
       if (order.status !== "completed") throw Object.assign(new Error("Chỉ có thể hủy hóa đơn đã hoàn thành."), { statusCode: 409, code: "ORDER_NOT_CANCELLABLE" });
 
       const completedPayments = await tx.select({ id: payments.id, amountVnd: payments.amountVnd })
@@ -295,11 +398,12 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
       if (!Number.isSafeInteger(tendered) || tendered < 0) {
         throw Object.assign(new Error("Số tiền khách trả không hợp lệ."), { statusCode: 422, code: "INVALID_TENDER" });
       }
+      const isEstimate = request.body.mode === "estimate";
       const paidAmount = Math.min(tendered, Number(total));
       const creditAmount = Number(total) - paidAmount;
       const paymentMethod = request.body.paymentMethod ?? "cash";
       let bankCashAccountId: string | null = null;
-      if (paymentMethod === "bank_transfer") {
+      if (!isEstimate && paymentMethod === "bank_transfer") {
         if (Number(total) <= 0) {
           throw Object.assign(new Error("Đơn hàng không có số tiền cần thanh toán bằng chuyển khoản."), { statusCode: 422, code: "ZERO_TOTAL_BANK_TRANSFER" });
         }
@@ -326,7 +430,7 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
         customerNameSnapshot: selectedCustomerName || null,
         receiptCode: orderNumber,
         orderNumber,
-        status: "completed",
+        status: isEstimate ? "awaiting_payment" : "completed",
         orderType: request.body.orderType,
         serviceLocation: request.body.orderType === "dine_in" ? "Bàn 06" : request.body.orderType === "delivery" ? "Giao hàng" : "Mang đi",
         cashierName: account.displayName,
@@ -336,13 +440,13 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
         serviceFeePercent: 0,
         serviceFeeVnd: Number(serviceFee),
         totalVnd: Number(total),
-        amountTenderedVnd: tendered,
-        changeVnd: Math.max(0, tendered - Number(total)),
-        closedAt: new Date(),
+        amountTenderedVnd: isEstimate ? 0 : tendered,
+        changeVnd: isEstimate ? 0 : Math.max(0, tendered - Number(total)),
+        closedAt: isEstimate ? null : new Date(),
       }).returning({ id: orders.id, orderNumber: orders.orderNumber, totalVnd: orders.totalVnd });
 
       await tx.insert(orderItems).values(discountedLineItems.map((item) => ({ ...item, orderId: created.id })));
-      if (paidAmount > 0) {
+      if (!isEstimate && paidAmount > 0) {
         const [payment] = await tx.insert(payments).values({
           orderId: created.id, amountVnd: paidAmount, method: paymentMethod, status: "completed",
           externalReference: paymentMethod === "bank_transfer" ? request.body.transferReference?.trim() : null,
@@ -360,17 +464,17 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
           createdByName: account.displayName,
         });
       }
-      if (creditAmount > 0) {
+      if (!isEstimate && creditAmount > 0) {
         await tx.insert(payments).values({ orderId: created.id, amountVnd: creditAmount, method: "credit", status: "pending" });
       }
-      await tx.insert(inventoryMovements).values(lineItems.map((item) => ({
+      if (!isEstimate) await tx.insert(inventoryMovements).values(lineItems.map((item) => ({
         productId: item.productId,
         quantityDelta: -item.quantity,
         reason: "sale" as const,
         note: `Bán hàng ${orderNumber}`,
         createdByName: account.displayName,
       })));
-      await tx.insert(auditLogs).values({ accountId: account.id, actorName: account.displayName, action: "created", entityType: "order", entityId: created.id, summary: `Tạo hóa đơn ${created.orderNumber}.` });
+      await tx.insert(auditLogs).values({ accountId: account.id, actorName: account.displayName, action: isEstimate ? "estimated" : "created", entityType: "order", entityId: created.id, summary: `${isEstimate ? "Tạm tính đơn" : "Tạo hóa đơn"} ${created.orderNumber}.` });
 
       return { ...created, changeVnd: Math.max(0, tendered - Number(total)), creditVnd: creditAmount };
     });

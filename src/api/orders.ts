@@ -1,6 +1,7 @@
 export type CreateOrderInput = {
   items: Array<{ productId: string; quantity: number }>;
   orderType: "dine_in" | "takeaway" | "delivery";
+  mode?: "payment" | "estimate";
   note?: string;
   amountReceivedVnd?: number;
   paymentMethod?: "cash" | "bank_transfer";
@@ -33,6 +34,7 @@ export type OrderRecord = {
 
 export type OrderDetailRecord = OrderRecord & {
   items: Array<{
+    productId: string | null;
     name: string;
     portion: string | null;
     note: string | null;
@@ -57,6 +59,17 @@ export async function createOrder(input: CreateOrderInput, idempotencyKey: strin
   const body = await response.json().catch(() => null);
   if (!response.ok) throw new Error(body?.error?.message ?? "Không thể hoàn tất thanh toán. Vui lòng thử lại.");
   return body.order as CreatedOrder;
+}
+
+export async function payOrder(id: string, input: { amountReceivedVnd: number; paymentMethod: "cash" | "bank_transfer"; transferReference?: string; bankAccountId?: string }, idempotencyKey: string): Promise<string> {
+  const response = await fetch(`/api/orders/${id}/pay`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "idempotency-key": idempotencyKey },
+    body: JSON.stringify(input),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(body?.error?.message ?? "Không thể thanh toán đơn tạm tính.");
+  return body.order.orderNumber as string;
 }
 
 export async function getOrders(): Promise<OrderRecord[]> {

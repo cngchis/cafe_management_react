@@ -3590,6 +3590,21 @@ td strong {
   min-width: 0;
 }
 
+.pos-estimates-button { min-height: 38px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; flex: none; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.pos-estimates-button:hover { border-color: var(--brand); color: var(--brand); }
+.estimate-list-overlay { position: fixed; inset: 0; z-index: 85; padding: 18px; display: grid; place-items: center; background: rgba(22, 29, 38, .5); }
+.estimate-list-dialog { width: min(480px, 100%); max-height: min(78vh, 620px); overflow: auto; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 18px 50px rgba(15, 23, 42, .2); }
+.estimate-list-dialog > header { padding: 18px 18px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); }
+.estimate-list-dialog h2 { margin: 0; font: 700 17px "Manrope", sans-serif; }
+.estimate-list-dialog header p { margin: 4px 0 0; color: var(--ink-soft); font-size: 12px; }
+.estimate-list-message { padding: 18px; color: var(--ink-soft); font-size: 13px; }
+.estimate-list-row { width: 100%; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; gap: 16px; border: 0; border-bottom: 1px solid var(--line); background: #fff; color: var(--ink); text-align: left; cursor: pointer; }
+.estimate-list-row:hover { background: #f7f9f8; }
+.estimate-list-row > span { min-width: 0; display: grid; gap: 4px; }
+.estimate-list-row > span strong { font-size: 13px; }
+.estimate-list-row small { color: var(--ink-soft); font-size: 11px; }
+.estimate-list-row > strong { flex: none; font-size: 13px; }
+
 .cart-toggle {
   position: fixed;
   right: 24px;
@@ -3779,6 +3794,11 @@ td strong {
   overflow: hidden;
 }
 
+.cart-submit-actions { display: grid; grid-template-columns: minmax(88px, .7fr) minmax(0, 1.3fr); gap: 8px; padding: 0 18px 16px; }
+.cart-submit-actions .pay-button { margin: 0; }
+.estimate-button { min-height: 48px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.estimate-button:disabled { opacity: .55; cursor: not-allowed; }
+
 .cart-overlay {
   position: fixed;
   inset: 0;
@@ -3922,6 +3942,9 @@ td strong {
   border-radius: 9px;
   object-fit: cover;
 }
+
+.estimate-cart-item-icon { width: 48px; height: 48px; flex: none; display: grid; place-items: center; border-radius: 9px; background: #eef3f0; color: var(--brand); }
+.estimate-cart-quantity { color: var(--ink-soft); font-size: 11px; font-weight: 700; }
 
 .cart-item-main {
   min-width: 0;
@@ -4715,6 +4738,8 @@ td strong {
   .pos-actions {
     width: 100%;
   }
+
+  .pos-estimates-button { padding: 0 9px; font-size: 11px; }
 
   .search-box {
     width: 100%;

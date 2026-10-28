@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { Account } from "../api/auth";
 import { Icon } from "../components/Icon";
 import { InvoiceDetail, type Invoice } from "../components/InvoiceDetail";
@@ -35,7 +36,7 @@ function toInvoice(order: OrderRecord): Invoice {
     serviceFee: order.serviceFeeVnd,
     paidAmount: order.paidAmountVnd,
     discount: order.discountVnd,
-    status: order.status === "completed" ? "Hoàn thành" : order.status === "cancelled" ? "Đã hủy" : order.status,
+    status: order.status === "completed" ? "Hoàn thành" : order.status === "cancelled" ? "Đã hủy" : order.status === "awaiting_payment" ? "Chờ thanh toán" : order.status,
     paymentMethod: order.status === "cancelled" ? "Đã hoàn tiền" : displayPaymentMethod(order.paymentMethod),
     orderType: displayOrderType(order),
     orderNumber: order.orderNumber,
@@ -79,6 +80,7 @@ function matchesPeriod(orderedAt: string, period: string) {
 }
 
 export function InvoicesPage({ role }: { role: Account["role"] }) {
+  const navigate = useNavigate();
   const [period, setPeriod] = useState("Hôm nay");
   const [branch, setBranch] = useState(branches[0]);
   const [query, setQuery] = useState("");
@@ -96,7 +98,7 @@ export function InvoicesPage({ role }: { role: Account["role"] }) {
     setIsLoading(true);
     setLoadError("");
     try {
-      setInvoices((await getOrders()).map(toInvoice));
+      setInvoices((await getOrders()).filter((order) => order.status !== "awaiting_payment").map(toInvoice));
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Không tải được hóa đơn.");
     } finally {
@@ -143,7 +145,7 @@ export function InvoicesPage({ role }: { role: Account["role"] }) {
     .sort((first, second) => (sortDescending ? -1 : 1) * first.orderedAt.localeCompare(second.orderedAt));
   const invoiceTotal = visibleInvoices.reduce((sum, invoice) => sum + (invoice.status === "Hoàn thành" ? invoice.total : 0), 0);
 
-  if (selectedInvoice) return <InvoiceDetail invoice={selectedInvoice} onBack={closeInvoice} canCancel={role !== "cashier"} onCancel={handleCancelInvoice} />;
+  if (selectedInvoice) return <InvoiceDetail invoice={selectedInvoice} onBack={closeInvoice} canCancel={role !== "cashier"} onCancel={handleCancelInvoice} onResume={(id) => navigate(`/pos?estimateId=${encodeURIComponent(id)}`)} />;
   if (selectedInvoiceId) return <div className="invoice-detail-page page-enter">
     <nav className="invoice-detail-nav" aria-label="Điều hướng chi tiết hóa đơn">
       <button className="invoice-back" aria-label="Quay lại hóa đơn" onClick={closeInvoice}><Icon name="chevron" size={28} /></button>
