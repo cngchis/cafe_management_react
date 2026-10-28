@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import type { Account } from "../api/auth";
 import { Icon } from "../components/Icon";
 import { InvoiceDetail, type Invoice } from "../components/InvoiceDetail";
 import { cancelOrder, getOrder, getOrders, type OrderDetailRecord, type OrderRecord } from "../api/orders";
 
-const periods = ["Hôm nay", "Hôm qua", "Tuần này", "Tháng này"];
+const periods = ["Toàn thời gian", "Hôm nay", "Hôm qua", "7 ngày qua", "Tháng này", "Tháng trước", "Tùy chỉnh"];
 const hours = Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, "0")}:00`);
 const formatAmount = (amount: number) => amount.toLocaleString("en-US");
 
@@ -62,18 +63,34 @@ function toInvoiceDetail(order: OrderDetailRecord): Invoice {
   };
 }
 
-function matchesPeriod(orderedAt: string, period: string) {
+function toLocalDateValue(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function matchesPeriod(orderedAt: string, period: string, dateFrom: string, dateTo: string) {
+  const date = new Date(orderedAt);
+  if (period === "Toàn thời gian") return true;
+  if (period === "Tùy chỉnh") {
+    const start = new Date(`${dateFrom}T00:00:00`);
+    const end = new Date(`${dateTo}T00:00:00`);
+    end.setDate(end.getDate() + 1);
+    return date >= start && date < end;
+  }
   const now = new Date();
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
   if (period === "Hôm qua") start.setDate(start.getDate() - 1);
-  else if (period === "Tuần này") start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  else if (period === "7 ngày qua") start.setDate(start.getDate() - 6);
   else if (period === "Tháng này") start.setDate(1);
-  const date = new Date(orderedAt);
+  else if (period === "Tháng trước") {
+    start.setDate(1);
+    start.setMonth(start.getMonth() - 1);
+  }
   if (date < start) return false;
-  if (period === "Hôm qua") {
+  if (period === "Hôm qua" || period === "Tháng trước") {
     const end = new Date(start);
-    end.setDate(end.getDate() + 1);
+    if (period === "Hôm qua") end.setDate(end.getDate() + 1);
+    else end.setMonth(end.getMonth() + 1);
     return date < end;
   }
   return true;
@@ -81,7 +98,10 @@ function matchesPeriod(orderedAt: string, period: string) {
 
 export function InvoicesPage({ role }: { role: Account["role"] }) {
   const navigate = useNavigate();
-  const [period, setPeriod] = useState("Hôm nay");
+  const [period, setPeriod] = useState("Toàn thời gian");
+  const [dateFrom, setDateFrom] = useState(() => toLocalDateValue(new Date()));
+  const [dateTo, setDateTo] = useState(() => toLocalDateValue(new Date()));
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [startHour, setStartHour] = useState(0);
   const [endHour, setEndHour] = useState(23);
   const [isHourPickerOpen, setIsHourPickerOpen] = useState(false);
@@ -141,7 +161,7 @@ export function InvoicesPage({ role }: { role: Account["role"] }) {
   };
 
   const visibleInvoices = invoices
-    .filter((invoice) => matchesPeriod(invoice.orderedAt, period))
+    .filter((invoice) => matchesPeriod(invoice.orderedAt, period, dateFrom, dateTo))
     .filter((invoice) => {
       const hour = new Date(invoice.orderedAt).getHours();
       return startHour <= endHour
@@ -174,24 +194,43 @@ export function InvoicesPage({ role }: { role: Account["role"] }) {
     </header>
     {searchOpen && <label className="menu-search"><Icon name="search" size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm mã hóa đơn..." /><button type="button" aria-label="Đóng tìm kiếm" onClick={() => { setSearchOpen(false); setQuery(""); }}><Icon name="close" size={17} /></button></label>}
     <div className="invoice-filters">
-      <label className="cashbook-select"><Icon name="filter" size={17} /><select value={period} onChange={(event) => setPeriod(event.target.value)}>{periods.map((item) => <option key={item}>{item}</option>)}</select><Icon name="chevron" size={15} /></label>
+      <button type="button" className="cashbook-select invoice-date-trigger" aria-expanded={isDatePickerOpen} onClick={() => setIsDatePickerOpen(true)}><Icon name="filter" size={17} /><span>{period}</span><Icon name="chevron" size={15} /></button>
       <div className="invoice-hour-filter">
         <button type="button" className="cashbook-select invoice-hour-trigger" aria-expanded={isHourPickerOpen} onClick={() => setIsHourPickerOpen((open) => !open)}>
-          <span>{startHour === 0 && endHour === 23 ? "Tất cả khung giờ" : `${startHour}h–${endHour}h`}</span><Icon name="chevron" size={15} />
+          <span>{startHour === 0 && endHour === 23 ? "Khung giờ" : `${startHour}h–${endHour}h`}</span><Icon name="chevron" size={15} />
         </button>
-        {isHourPickerOpen && <div className="invoice-hour-popover" role="group" aria-label="Chọn khung giờ">
-          <label><span>Từ</span><select aria-label="Giờ bắt đầu" value={startHour} onChange={(event) => setStartHour(Number(event.target.value))}>{hours.map((item, index) => <option key={index} value={index}>{item}</option>)}</select></label>
-          <label><span>Đến</span><select aria-label="Giờ kết thúc" value={endHour} onChange={(event) => setEndHour(Number(event.target.value))}>{hours.map((item, index) => <option key={index} value={index}>{item}</option>)}</select></label>
-          <button type="button" className="primary-button" onClick={() => setIsHourPickerOpen(false)}>Áp dụng</button>
-        </div>}
       </div>
     </div>
+    {isDatePickerOpen && createPortal(<div className="invoice-date-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsDatePickerOpen(false); }}>
+      <section className="invoice-date-sheet" role="dialog" aria-modal="true" aria-labelledby="invoice-date-title">
+        <h2 id="invoice-date-title">Thời gian</h2>
+        <div className="invoice-date-options">
+          {periods.filter((item) => item !== "Tùy chỉnh").map((item) => <button key={item} type="button" className={period === item ? "active" : ""} onClick={() => { setPeriod(item); setIsDatePickerOpen(false); }}>{item}{period === item && <Icon name="check" size={22} />}</button>)}
+          <button type="button" className={`invoice-date-custom ${period === "Tùy chỉnh" ? "active" : ""}`} onClick={() => setPeriod("Tùy chỉnh")}>Tùy chỉnh</button>
+        </div>
+        {period === "Tùy chỉnh" && <div className="invoice-custom-dates">
+          <label>Từ ngày<input type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); if (dateTo < event.target.value) setDateTo(event.target.value); }} /></label>
+          <label>Đến ngày<input type="date" min={dateFrom} value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></label>
+        </div>}
+        <button className="invoice-date-back" type="button" onClick={() => setIsDatePickerOpen(false)}>{period === "Tùy chỉnh" ? "Áp dụng" : "Quay lại"}</button>
+      </section>
+    </div>, document.body)}
+    {isHourPickerOpen && createPortal(<div className="invoice-date-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsHourPickerOpen(false); }}>
+      <section className="invoice-date-sheet invoice-hour-sheet" role="dialog" aria-modal="true" aria-labelledby="invoice-hour-title">
+        <h2 id="invoice-hour-title">Khung giờ</h2>
+        <div className="invoice-custom-dates">
+          <label>Từ giờ<select aria-label="Giờ bắt đầu" value={startHour} onChange={(event) => setStartHour(Number(event.target.value))}>{hours.map((item, index) => <option key={index} value={index}>{item}</option>)}</select></label>
+          <label>Đến giờ<select aria-label="Giờ kết thúc" value={endHour} onChange={(event) => setEndHour(Number(event.target.value))}>{hours.map((item, index) => <option key={index} value={index}>{item}</option>)}</select></label>
+        </div>
+        <button className="invoice-date-back" type="button" onClick={() => setIsHourPickerOpen(false)}>Áp dụng</button>
+      </section>
+    </div>, document.body)}
     <section className="invoice-summary">
       <div><button className="invoice-summary-label">Tổng thanh toán <Icon name="chevron" size={15} /></button><span>{visibleInvoices.length} hóa đơn</span></div>
       <strong>{formatAmount(invoiceTotal)}</strong>
     </section>
     <section className="invoice-ledger" aria-live="polite">
-      <div className="invoice-date">GIAO DỊCH GẦN ĐÂY · {period.toUpperCase()}</div>
+      <div className="invoice-date">GIAO DỊCH GẦN ĐÂY · {(period === "Tùy chỉnh" ? `${dateFrom} - ${dateTo}` : period).toUpperCase()}</div>
       {isLoading && <div className="management-empty" role="status">Đang tải hóa đơn...</div>}
       {!isLoading && loadError && <div className="management-empty" role="alert"><p>{loadError}</p><button type="button" onClick={() => void loadInvoices()}>Thử lại</button></div>}
       {!isLoading && !loadError && visibleInvoices.map((invoice) => <button className="invoice-row" key={invoice.recordId} type="button" onClick={() => void openInvoice(invoice.recordId)}>
