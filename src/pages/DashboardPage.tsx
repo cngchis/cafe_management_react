@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Icon, type IconName } from "../components/Icon";
 import { formatMoney } from "../data/products";
 import { getDashboardSummary, type DashboardSummary } from "../api/dashboard";
@@ -27,6 +28,7 @@ function orderLocation(order: DashboardSummary["recentOrders"][number]) {
 }
 
 export function DashboardPage({ goPos, canViewActivity = true }: { goPos: () => void; canViewActivity?: boolean }) {
+  const navigate = useNavigate();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -81,7 +83,7 @@ export function DashboardPage({ goPos, canViewActivity = true }: { goPos: () => 
     </section>
     <section className="dashboard-grid">
       <article className="panel revenue-panel">
-        <div className="panel-heading"><div><h3>Doanh thu thuần</h3><p>7 ngày gần nhất · theo ngày Việt Nam</p></div><button className="select-button" type="button">7 ngày qua <Icon name="chevron" size={15} /></button></div>
+        <div className="panel-heading"><div><h3>Doanh thu thuần</h3><p>7 ngày gần nhất · theo ngày Việt Nam</p></div><button className="select-button" type="button" onClick={() => navigate("/reports/analysis")}>7 ngày qua <Icon name="chevron" size={15} /></button></div>
         <div className="chart-wrap">
           <div className="y-labels">{axisLabels.map((value, index) => <span key={index}>{compactAmount(value)}</span>)}</div>
           <div className="bars">
@@ -97,7 +99,7 @@ export function DashboardPage({ goPos, canViewActivity = true }: { goPos: () => 
         </div>
       </article>
       <article className="panel best-sellers">
-        <div className="panel-heading"><div><h3>Món bán chạy</h3><p>Top sản phẩm hôm nay</p></div><button className="text-button" type="button">Xem tất cả</button></div>
+        <div className="panel-heading"><div><h3>Món bán chạy</h3><p>Top sản phẩm hôm nay</p></div><button className="text-button" type="button" onClick={() => navigate(canViewActivity ? "/reports/products" : "/reports/daily")}>Xem tất cả</button></div>
         <div className="best-list">
           {(summary?.bestSellers ?? []).map((product, index) => <div className="best-item" key={`${product.productId}-${product.name}`}>
             <span className="rank">0{index + 1}</span><img src={product.imageUrl || ""} alt="" />
@@ -108,10 +110,10 @@ export function DashboardPage({ goPos, canViewActivity = true }: { goPos: () => 
       </article>
     </section>
     <article className="panel orders-panel dashboard-orders-panel">
-      <div className="panel-heading"><div><h3>Đơn hàng gần đây</h3><p>Đơn đã thanh toán, mới nhất trước</p></div><button className="text-button" type="button">Xem tất cả <Icon name="chevron" size={14} /></button></div>
+      <div className="panel-heading"><div><h3>Đơn hàng gần đây</h3><p>Đơn đã thanh toán, mới nhất trước</p></div><button className="text-button" type="button" onClick={() => navigate("/invoices")}>Xem tất cả <Icon name="chevron" size={14} /></button></div>
       <div className="table-wrap"><table><thead><tr><th>MÃ ĐƠN</th><th>VỊ TRÍ</th><th>SỐ MÓN</th><th>TỔNG TIỀN</th><th>TRẠNG THÁI</th><th></th></tr></thead><tbody>
         {(summary?.recentOrders ?? []).map((order) => <tr key={order.id}>
-          <td><strong>{order.orderNumber}</strong></td><td>{orderLocation(order)}</td><td>{order.itemCount} món</td><td><strong>{formatMoney(order.totalVnd)}</strong></td><td><span className="status done">Hoàn thành</span></td><td><button className="row-action" type="button" aria-label={`Xem đơn ${order.orderNumber}`}><Icon name="chevron" size={16} /></button></td>
+          <td><strong>{order.orderNumber}</strong></td><td>{orderLocation(order)}</td><td>{order.itemCount} món</td><td><strong>{formatMoney(order.totalVnd)}</strong></td><td><span className="status done">Hoàn thành</span></td><td><button className="row-action" type="button" aria-label={`Xem đơn ${order.orderNumber}`} onClick={() => navigate("/invoices")}><Icon name="chevron" size={16} /></button></td>
         </tr>)}
         {!isLoading && !error && !summary?.recentOrders.length && <tr><td colSpan={6}>Chưa có đơn hàng đã thanh toán.</td></tr>}
       </tbody></table></div>
