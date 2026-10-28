@@ -38,7 +38,7 @@ function toInvoice(order: OrderRecord): Invoice {
     paidAmount: order.paidAmountVnd,
     discount: order.discountVnd,
     status: order.status === "completed" ? "Hoàn thành" : order.status === "cancelled" ? "Đã hủy" : order.status === "awaiting_payment" ? "Chờ thanh toán" : order.status,
-    paymentMethod: order.status === "cancelled" ? "Đã hoàn tiền" : displayPaymentMethod(order.paymentMethod),
+    paymentMethod: displayPaymentMethod(order.paymentMethod),
     orderType: displayOrderType(order),
     orderNumber: order.orderNumber,
     guests: order.guestCount,
@@ -102,6 +102,10 @@ export function InvoicesPage({ role }: { role: Account["role"] }) {
   const [dateFrom, setDateFrom] = useState(() => toLocalDateValue(new Date()));
   const [dateTo, setDateTo] = useState(() => toLocalDateValue(new Date()));
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedMethods, setSelectedMethods] = useState<string[]>([]);
+  const [selectedCashier, setSelectedCashier] = useState("all");
   const [startHour, setStartHour] = useState(0);
   const [endHour, setEndHour] = useState(23);
   const [isHourPickerOpen, setIsHourPickerOpen] = useState(false);
@@ -153,10 +157,10 @@ export function InvoicesPage({ role }: { role: Account["role"] }) {
   const handleCancelInvoice = async (id: string) => {
     await cancelOrder(id);
     setInvoices((current) => current.map((invoice) => invoice.recordId === id
-      ? { ...invoice, status: "Đã hủy", paidAmount: 0, paymentMethod: "Đã hoàn tiền" }
+      ? { ...invoice, status: "Đã hủy", paidAmount: 0 }
       : invoice));
     setSelectedInvoice((current) => current?.recordId === id
-      ? { ...current, status: "Đã hủy", paidAmount: 0, paymentMethod: "Đã hoàn tiền" }
+      ? { ...current, status: "Đã hủy", paidAmount: 0 }
       : current);
   };
 
@@ -168,10 +172,17 @@ export function InvoicesPage({ role }: { role: Account["role"] }) {
         ? hour >= startHour && hour <= endHour
         : hour >= startHour || hour <= endHour;
     })
+    .filter((invoice) => !selectedStatuses.length || selectedStatuses.includes(invoice.status))
+    .filter((invoice) => !selectedMethods.length || selectedMethods.includes(invoice.paymentMethod))
+    .filter((invoice) => selectedCashier === "all" || invoice.cashier === selectedCashier)
     .filter((invoice) => invoice.id.toLowerCase().includes(query.toLowerCase()) || invoice.customer.toLowerCase().includes(query.toLowerCase()))
     .slice()
     .sort((first, second) => (sortDescending ? -1 : 1) * first.orderedAt.localeCompare(second.orderedAt));
   const invoiceTotal = visibleInvoices.reduce((sum, invoice) => sum + (invoice.status === "Hoàn thành" ? invoice.total : 0), 0);
+  const cashiers = [...new Set(invoices.map((invoice) => invoice.cashier).filter((cashier) => cashier && cashier !== "—"))].sort((first, second) => first.localeCompare(second, "vi"));
+  const toggleFilterOption = (options: string[], setOptions: (next: string[]) => void, option: string) => {
+    setOptions(options.includes(option) ? options.filter((item) => item !== option) : [...options, option]);
+  };
 
   if (selectedInvoice) return <InvoiceDetail invoice={selectedInvoice} onBack={closeInvoice} canCancel={role !== "cashier"} onCancel={handleCancelInvoice} onResume={(id) => navigate(`/pos?estimateId=${encodeURIComponent(id)}`)} />;
   if (selectedInvoiceId) return <div className="invoice-detail-page page-enter">
@@ -194,13 +205,35 @@ export function InvoicesPage({ role }: { role: Account["role"] }) {
     </header>
     {searchOpen && <label className="menu-search"><Icon name="search" size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm mã hóa đơn..." /><button type="button" aria-label="Đóng tìm kiếm" onClick={() => { setSearchOpen(false); setQuery(""); }}><Icon name="close" size={17} /></button></label>}
     <div className="invoice-filters">
-      <button type="button" className="cashbook-select invoice-date-trigger" aria-expanded={isDatePickerOpen} onClick={() => setIsDatePickerOpen(true)}><Icon name="filter" size={17} /><span>{period}</span><Icon name="chevron" size={15} /></button>
+      <button type="button" className="cashbook-select invoice-filter-trigger" aria-label="Mở bộ lọc hóa đơn" aria-expanded={isFilterOpen} onClick={() => setIsFilterOpen(true)}><Icon name="filter" size={17} /></button>
+      <button type="button" className="cashbook-select invoice-date-trigger" aria-expanded={isDatePickerOpen} onClick={() => setIsDatePickerOpen(true)}><Icon name="calendar" size={17} /><span>{period}</span><Icon name="chevron" size={15} /></button>
       <div className="invoice-hour-filter">
         <button type="button" className="cashbook-select invoice-hour-trigger" aria-expanded={isHourPickerOpen} onClick={() => setIsHourPickerOpen((open) => !open)}>
           <span>{startHour === 0 && endHour === 23 ? "Khung giờ" : `${startHour}h–${endHour}h`}</span><Icon name="chevron" size={15} />
         </button>
       </div>
     </div>
+    {isFilterOpen && createPortal(<div className="invoice-date-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsFilterOpen(false); }}>
+      <section className="invoice-date-sheet invoice-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="invoice-filter-title">
+        <h2 id="invoice-filter-title">Bộ lọc hóa đơn</h2>
+        <fieldset className="invoice-filter-group">
+          <legend>Trạng thái hóa đơn</legend>
+          {["Hoàn thành", "Đã hủy"].map((status) => <label key={status}><input type="checkbox" checked={selectedStatuses.includes(status)} onChange={() => toggleFilterOption(selectedStatuses, setSelectedStatuses, status)} />{status}</label>)}
+        </fieldset>
+        <fieldset className="invoice-filter-group">
+          <legend>Phương thức thanh toán</legend>
+          {["Tiền mặt", "Chuyển khoản"].map((method) => <label key={method}><input type="checkbox" checked={selectedMethods.includes(method)} onChange={() => toggleFilterOption(selectedMethods, setSelectedMethods, method)} />{method}</label>)}
+        </fieldset>
+        <fieldset className="invoice-filter-group">
+          <legend>Người tạo</legend>
+          <select aria-label="Lọc theo người tạo hóa đơn" value={selectedCashier} onChange={(event) => setSelectedCashier(event.target.value)}>
+            <option value="all">Tất cả người tạo</option>
+            {cashiers.map((cashier) => <option key={cashier} value={cashier}>{cashier}</option>)}
+          </select>
+        </fieldset>
+        <button className="invoice-date-back" type="button" onClick={() => setIsFilterOpen(false)}>Áp dụng</button>
+      </section>
+    </div>, document.body)}
     {isDatePickerOpen && createPortal(<div className="invoice-date-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setIsDatePickerOpen(false); }}>
       <section className="invoice-date-sheet" role="dialog" aria-modal="true" aria-labelledby="invoice-date-title">
         <h2 id="invoice-date-title">Thời gian</h2>

@@ -33,7 +33,7 @@ export function PosTableSelectionPage() {
   };
 
   return <div className="pos-table-selection page-enter">
-    <header className="pos-table-selection-header"><div className="pos-table-brand"><span><Icon name="coffee" size={21} /></span><strong>CỘI</strong></div><div><p className="eyebrow">BÁN HÀNG</p><h2>Chọn phòng bàn</h2></div><button type="button" className="icon-button" onClick={() => navigate("/more")} aria-label="Mở menu"><Icon name="menu" size={22} /></button></header>
+    <header className="pos-table-selection-header"><div className="pos-table-brand"><span><Icon name="coffee" size={21} /></span><strong>CỘI</strong></div><button type="button" className="icon-button" onClick={() => navigate("/more")} aria-label="Mở menu"><Icon name="menu" size={22} /></button></header>
     <div className="pos-table-status-tabs" role="tablist" aria-label="Lọc trạng thái bàn">
       {([{ id: "all", label: "Tất cả" }, { id: "occupied", label: "Sử dụng" }, { id: "empty", label: "Còn trống" }] as const).map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={status === tab.id} className={status === tab.id ? "active" : ""} onClick={() => setStatus(tab.id)}>{tab.label}{tab.id !== "all" && <span>{tables.filter((table) => tab.id === "occupied" ? table.isOccupied : !table.isOccupied).length}</span>}</button>)}
     </div>
