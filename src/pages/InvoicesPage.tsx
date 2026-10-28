@@ -267,7 +267,7 @@ export function InvoicesPage({ role }: { role: Account["role"] }) {
       {isLoading && <div className="management-empty" role="status">Đang tải hóa đơn...</div>}
       {!isLoading && loadError && <div className="management-empty" role="alert"><p>{loadError}</p><button type="button" onClick={() => void loadInvoices()}>Thử lại</button></div>}
       {!isLoading && !loadError && visibleInvoices.map((invoice) => <button className="invoice-row" key={invoice.recordId} type="button" onClick={() => void openInvoice(invoice.recordId)}>
-        <span className="invoice-row-copy"><strong>{invoice.id}</strong><small>{invoice.time} · {invoice.customer}</small><small>{invoice.orderType}</small></span>
+        <span className="invoice-row-copy"><strong>{invoice.id}</strong><small>{invoice.time} | {invoice.customer} | {invoice.cashier}</small><small>{invoice.orderType}</small></span>
         <span className="invoice-row-values"><strong>{formatAmount(invoice.total)}</strong><small>{invoice.status === "Đã hủy" ? "Đã hủy" : invoice.paymentMethod}</small></span>
       </button>)}
       {!isLoading && !loadError && !visibleInvoices.length && <div className="management-empty">Chưa có hóa đơn trong khoảng thời gian này.</div>}
