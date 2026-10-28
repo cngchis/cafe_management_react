@@ -5,7 +5,7 @@ import { Icon } from "../components/Icon";
 import { CartPanel } from "../components/CartPanel";
 import { formatMoney, type Product } from "../data/products";
 import { getProducts } from "../api/products";
-import { cancelOrder, createOrder, getOrder, getOrders, payOrder, type OrderDetailRecord, type OrderRecord } from "../api/orders";
+import { cancelOrder, createOrder, deleteEstimate as removeEstimate, getOrder, getOrders, payOrder, type OrderDetailRecord, type OrderRecord } from "../api/orders";
 import { getPriceListTargets, type CustomerTarget } from "../api/moreOperations";
 import { createCustomer } from "../api/customers";
 import { getBankAccounts, type BankAccount } from "../api/cashbook";
@@ -82,7 +82,7 @@ export function PosPage() {
   }, [successNotice]);
 
   const deleteEstimate = async (id: string) => {
-    await cancelOrder(id);
+    await removeEstimate(id);
     setCartOpen(false);
     navigate("/pos");
   };

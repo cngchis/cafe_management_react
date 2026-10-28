@@ -20,6 +20,7 @@ function displayOrderType(order: OrderRecord) {
 function displayPaymentMethod(method: string | null) {
   if (method === "bank_transfer") return "Chuyển khoản";
   if (method === "card") return "Thẻ";
+  if (method === "credit") return "Công nợ";
   if (method === "other") return "Khác";
   return method ? "Tiền mặt" : "Chưa thanh toán";
 }

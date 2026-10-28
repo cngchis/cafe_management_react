@@ -87,3 +87,8 @@ export async function cancelOrder(id: string): Promise<void> {
   const response = await fetch(`/api/orders/${id}/cancel`, { method: "POST" });
   if (!response.ok) await readResponse<void>(response);
 }
+
+export async function deleteEstimate(id: string): Promise<void> {
+  const response = await fetch(`/api/orders/${id}`, { method: "DELETE" });
+  if (!response.ok) await readResponse<void>(response);
+}
