@@ -4631,6 +4631,7 @@ td strong {
 .bank-account-list { margin-top: 12px; }
 .bank-account-row { padding: 12px 2px; border-top: 1px solid #edf0f3; }
 .bank-account-row > div { min-width: 0; display: grid; gap: 3px; }
+.bank-account-row > .bank-account-row-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 12px; }
 .bank-account-row strong { font-size: 12px; }
 .bank-account-row span,
 .bank-account-row small { color: var(--ink-soft); font-size: 11px; overflow-wrap: anywhere; }

@@ -71,6 +71,42 @@ export const cashbookRoutes: FastifyPluginAsync = async (app) => {
     return reply.code(201).send(result);
   });
 
+  app.patch<{ Params: { id: string }; Body: BankAccountBody }>("/cashbook/bank-accounts/:id", {
+    schema: {
+      body: {
+        type: "object", additionalProperties: false,
+        required: ["bankName", "bankCode", "accountNumber", "accountHolder"],
+        properties: {
+          bankName: { type: "string", minLength: 1, maxLength: 100 },
+          bankCode: { type: "string", minLength: 2, maxLength: 20 },
+          accountNumber: { type: "string", minLength: 4, maxLength: 32 },
+          accountHolder: { type: "string", minLength: 1, maxLength: 100 },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const account = await getSessionAccount(request);
+    if (!account) return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lÃ²ng Ä‘Äƒng nháº­p." } });
+    if (!canManageBankAccounts(account.role)) return reply.code(403).send({ error: { code: "FORBIDDEN", message: "Báº¡n khÃ´ng cÃ³ quyá»n quáº£n lÃ½ tÃ i khoáº£n ngÃ¢n hÃ ng." } });
+    const bankName = request.body.bankName.trim();
+    const bankCode = request.body.bankCode.trim().toUpperCase();
+    const accountNumber = request.body.accountNumber.trim();
+    const accountHolder = request.body.accountHolder.trim().toUpperCase();
+    if (!bankName || !bankCode || !accountNumber || !accountHolder) {
+      return reply.code(400).send({ error: { code: "INVALID_BANK_ACCOUNT", message: "Vui lÃ²ng nháº­p Ä‘áº§y Ä‘á»§ thÃ´ng tin ngÃ¢n hÃ ng." } });
+    }
+    const [updated] = await db.update(cashAccounts).set({
+      name: `${bankName} Â· ${accountNumber}`, bankName, bankCode, accountNumber, accountHolder,
+    }).where(and(eq(cashAccounts.id, request.params.id), eq(cashAccounts.accountType, "bank"), eq(cashAccounts.isActive, true)))
+      .returning({ id: cashAccounts.id });
+    if (!updated) return reply.code(404).send({ error: { code: "BANK_ACCOUNT_NOT_FOUND", message: "KhÃ´ng tÃ¬m tháº¥y tÃ i khoáº£n ngÃ¢n hÃ ng." } });
+    const [result] = await db.select({
+      id: cashAccounts.id, bankName: cashAccounts.bankName, bankCode: cashAccounts.bankCode,
+      accountNumber: cashAccounts.accountNumber, accountHolder: cashAccounts.accountHolder, isDefault: cashAccounts.isDefault,
+    }).from(cashAccounts).where(eq(cashAccounts.id, updated.id)).limit(1);
+    return result;
+  });
+
   app.patch<{ Params: { id: string } }>("/cashbook/bank-accounts/:id/default", async (request, reply) => {
     const account = await getSessionAccount(request);
     if (!account) return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lòng đăng nhập." } });
@@ -84,6 +120,27 @@ export const cashbookRoutes: FastifyPluginAsync = async (app) => {
       return true;
     });
     if (!result) return reply.code(404).send({ error: { code: "BANK_ACCOUNT_NOT_FOUND", message: "Không tìm thấy tài khoản ngân hàng." } });
+    return { ok: true };
+  });
+
+  app.delete<{ Params: { id: string } }>("/cashbook/bank-accounts/:id", async (request, reply) => {
+    const account = await getSessionAccount(request);
+    if (!account) return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lÃ²ng Ä‘Äƒng nháº­p." } });
+    if (!canManageBankAccounts(account.role)) return reply.code(403).send({ error: { code: "FORBIDDEN", message: "Báº¡n khÃ´ng cÃ³ quyá»n quáº£n lÃ½ tÃ i khoáº£n ngÃ¢n hÃ ng." } });
+    const deleted = await db.transaction(async (tx) => {
+      const [selected] = await tx.select({ id: cashAccounts.id, isDefault: cashAccounts.isDefault }).from(cashAccounts)
+        .where(and(eq(cashAccounts.id, request.params.id), eq(cashAccounts.accountType, "bank"), eq(cashAccounts.isActive, true))).limit(1);
+      if (!selected) return false;
+      await tx.update(cashAccounts).set({ isActive: false, isDefault: false }).where(eq(cashAccounts.id, selected.id));
+      if (selected.isDefault) {
+        const [nextDefault] = await tx.select({ id: cashAccounts.id }).from(cashAccounts)
+          .where(and(eq(cashAccounts.accountType, "bank"), eq(cashAccounts.isActive, true)))
+          .orderBy(desc(cashAccounts.createdAt)).limit(1);
+        if (nextDefault) await tx.update(cashAccounts).set({ isDefault: true }).where(eq(cashAccounts.id, nextDefault.id));
+      }
+      return true;
+    });
+    if (!deleted) return reply.code(404).send({ error: { code: "BANK_ACCOUNT_NOT_FOUND", message: "KhÃ´ng tÃ¬m tháº¥y tÃ i khoáº£n ngÃ¢n hÃ ng." } });
     return { ok: true };
   });
 

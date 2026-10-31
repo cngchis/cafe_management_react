@@ -58,6 +58,18 @@ export async function saveBankAccount(input: Omit<BankAccount, "id" | "isDefault
   }));
 }
 
+export async function updateBankAccount(id: string, input: Omit<BankAccount, "id" | "isDefault">): Promise<BankAccount> {
+  return readResponse<BankAccount>(await fetch(`/api/cashbook/bank-accounts/${id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  }));
+}
+
+export async function deleteBankAccount(id: string): Promise<void> {
+  await readResponse(await fetch(`/api/cashbook/bank-accounts/${id}`, { method: "DELETE" }));
+}
+
 export async function setDefaultBankAccount(id: string): Promise<void> {
   await readResponse(await fetch(`/api/cashbook/bank-accounts/${id}/default`, { method: "PATCH" }));
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { Icon, type IconName } from "../components/Icon";
 import { CashbookEntryForm, type CashbookEntryFormData } from "../components/CashbookEntryForm";
-import { createCashbookEntry, getBankAccounts, getCashbook, saveBankAccount, setDefaultBankAccount, type BankAccount, type CashbookData, type CashbookEntryRecord } from "../api/cashbook";
+import { createCashbookEntry, deleteBankAccount, getBankAccounts, getCashbook, saveBankAccount, setDefaultBankAccount, updateBankAccount, type BankAccount, type CashbookData, type CashbookEntryRecord } from "../api/cashbook";
 
 type Account = "Tiền mặt" | "Ngân hàng" | "Tổng quỹ";
 const formatAmount = (amount: number) => amount.toLocaleString("en-US");
@@ -16,7 +16,9 @@ export function CashbookPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [bankFormOpen, setBankFormOpen] = useState(false);
+  const [editingBankId, setEditingBankId] = useState<string | null>(null);
   const [bankSaving, setBankSaving] = useState(false);
+  const [deletingBankId, setDeletingBankId] = useState<string | null>(null);
   const [bankError, setBankError] = useState("");
   const [bankForm, setBankForm] = useState({ bankName: "", bankCode: "", accountNumber: "", accountHolder: "" });
   const refresh = useCallback(async () => {
@@ -49,9 +51,11 @@ export function CashbookPage() {
     setBankSaving(true);
     setBankError("");
     try {
-      await saveBankAccount(bankForm);
+      if (editingBankId) await updateBankAccount(editingBankId, bankForm);
+      else await saveBankAccount(bankForm);
       setBankForm({ bankName: "", bankCode: "", accountNumber: "", accountHolder: "" });
       setBankFormOpen(false);
+      setEditingBankId(null);
       await refreshBankAccounts();
     } catch (cause) {
       setBankError(cause instanceof Error ? cause.message : "Không thể lưu tài khoản ngân hàng.");
@@ -65,6 +69,31 @@ export function CashbookPage() {
       await refreshBankAccounts();
     } catch (cause) {
       setBankError(cause instanceof Error ? cause.message : "Không thể đổi tài khoản mặc định.");
+    }
+  };
+
+  const editBankAccount = (bank: BankAccount) => {
+    setEditingBankId(bank.id);
+    setBankForm({ bankName: bank.bankName, bankCode: bank.bankCode, accountNumber: bank.accountNumber, accountHolder: bank.accountHolder });
+    setBankFormOpen(true);
+    setBankError("");
+  };
+
+  const removeBankAccount = async (bank: BankAccount) => {
+    if (!window.confirm(`Xóa tài khoản ${bank.bankName} · ${bank.accountNumber}? Lịch sử giao dịch vẫn được giữ lại.`)) return;
+    setDeletingBankId(bank.id);
+    setBankError("");
+    try {
+      await deleteBankAccount(bank.id);
+      if (editingBankId === bank.id) {
+        setEditingBankId(null);
+        setBankFormOpen(false);
+      }
+      await refreshBankAccounts();
+    } catch (cause) {
+      setBankError(cause instanceof Error ? cause.message : "Không thể xóa tài khoản ngân hàng.");
+    } finally {
+      setDeletingBankId(null);
     }
   };
 
@@ -106,7 +135,7 @@ export function CashbookPage() {
   return <>
     <div className="cashbook-page page-enter">
     <header className="cashbook-heading">
-      <div><span className="eyebrow">TÀI CHÍNH</span><h2>Sổ quỹ</h2></div>
+      <h2>Sổ quỹ</h2>
       <div className="cashbook-actions"><button className="icon-button" aria-label="Tìm giao dịch"><Icon name="search" /></button><button className="icon-button" aria-label="Xem thêm"><Icon name="menu" /></button></div>
     </header>
     {error && <p role="alert" className="management-empty">{error}</p>}
@@ -114,7 +143,7 @@ export function CashbookPage() {
       {(["Tiền mặt", "Ngân hàng", "Tổng quỹ"] as const).map((item) => <button key={item} role="tab" aria-selected={account === item} className={account === item ? "active" : ""} onClick={() => setAccount(item)}>{item}</button>)}
     </div>
     {account === "Ngân hàng" && <section className="bank-account-panel" aria-labelledby="bank-account-title">
-      <div className="bank-account-heading"><div><h3 id="bank-account-title">Tài khoản nhận chuyển khoản</h3><p>POS dùng tài khoản mặc định để tạo mã QR.</p></div><button type="button" className="primary-button" onClick={() => { setBankForm({ bankName: "", bankCode: "", accountNumber: "", accountHolder: "" }); setBankFormOpen((open) => !open); }}>{bankFormOpen ? "Đóng" : "+ Thêm ngân hàng"}</button></div>
+      <div className="bank-account-heading"><div><h3 id="bank-account-title">Tài khoản nhận chuyển khoản</h3><p>POS dùng tài khoản mặc định để tạo mã QR.</p></div><button type="button" className="primary-button" onClick={() => { if (bankFormOpen) { setBankFormOpen(false); setEditingBankId(null); } else { setBankForm({ bankName: "", bankCode: "", accountNumber: "", accountHolder: "" }); setEditingBankId(null); setBankFormOpen(true); } }}>{bankFormOpen ? "Đóng" : "+ Thêm ngân hàng"}</button></div>
       {bankError && <p className="bank-account-error" role="alert">{bankError}</p>}
       {bankFormOpen && <form className="bank-account-form" onSubmit={(event) => void saveBank(event)}>
         <label><span>Tên ngân hàng</span><input required maxLength={100} value={bankForm.bankName} onChange={(event) => setBankForm({ ...bankForm, bankName: event.target.value })} placeholder="Ví dụ: Ngân hàng Á Châu" /></label>
@@ -122,12 +151,13 @@ export function CashbookPage() {
         <label><span>Số tài khoản</span><input required maxLength={32} value={bankForm.accountNumber} onChange={(event) => setBankForm({ ...bankForm, accountNumber: event.target.value })} /></label>
         <label><span>Chủ tài khoản</span><input required maxLength={100} value={bankForm.accountHolder} onChange={(event) => setBankForm({ ...bankForm, accountHolder: event.target.value.toUpperCase() })} /></label>
         <p>Mã ngân hàng cần đúng mã VietQR để sinh QR chuyển khoản.</p>
-        <button className="primary-button" type="submit" disabled={bankSaving}>{bankSaving ? "Đang lưu..." : "Lưu và đặt mặc định"}</button>
+        <button className="primary-button" type="submit" disabled={bankSaving}>{bankSaving ? "Đang lưu..." : editingBankId ? "Lưu thay đổi" : "Lưu và đặt mặc định"}</button>
+        {editingBankId && <button className="text-button" type="button" disabled={bankSaving} onClick={() => { setEditingBankId(null); setBankFormOpen(false); }}>Hủy chỉnh sửa</button>}
       </form>}
       <div className="bank-account-list">
         {bankAccounts.map((bank) => <article className="bank-account-row" key={bank.id}>
           <div><strong>{bank.bankName}</strong><span>{bank.accountNumber} · {bank.accountHolder}</span><small>Mã VietQR: {bank.bankCode}</small></div>
-          {bank.isDefault ? <span className="bank-default-badge">Mặc định cho POS</span> : <button type="button" className="text-button" onClick={() => void chooseDefaultBank(bank)}>Đặt mặc định</button>}
+          <div className="bank-account-row-actions"><button type="button" className="text-button" disabled={Boolean(deletingBankId)} onClick={() => editBankAccount(bank)}>Chỉnh sửa</button>{bank.isDefault ? <span className="bank-default-badge">Mặc định cho POS</span> : <button type="button" className="text-button" disabled={Boolean(deletingBankId)} onClick={() => void chooseDefaultBank(bank)}>Đặt mặc định</button>}<button type="button" className="text-button danger-text" disabled={deletingBankId === bank.id} onClick={() => void removeBankAccount(bank)}>{deletingBankId === bank.id ? "Đang xóa..." : "Xóa"}</button></div>
         </article>)}
         {!bankAccounts.length && !bankError && <p className="bank-account-empty">Chưa có tài khoản ngân hàng. Thêm tài khoản để nhận chuyển khoản bằng QR tại POS.</p>}
       </div>
