@@ -1792,6 +1792,22 @@ td strong {
   .handover-form { grid-template-columns: 1fr; }
   .handover-history-row { grid-template-columns: 1fr auto; padding: 12px; }
   .handover-history-row > span:last-child { grid-column: 1 / -1; text-align: left; }
+  .handover-history-row > span[data-label]::before { content: attr(data-label); display: block; margin-bottom: 4px; color: var(--ink-faint); font-size: 10px; font-weight: 600; }
+  .schedule-week-grid { min-width: 0; grid-template-columns: 1fr; }
+  .schedule-day { min-height: 0; border-right: 0; border-bottom: 1px solid var(--line); }
+  .schedule-day h3 { padding: 12px 14px; text-align: left; }
+  .customer-invoices-panel .table-wrap { overflow: visible; }
+  .customer-invoices-panel table,
+  .customer-invoices-panel tbody,
+  .customer-invoices-panel tr,
+  .customer-invoices-panel td { display: block; width: 100%; }
+  .customer-invoices-panel thead { display: none; }
+  .customer-invoices-panel tr { padding: 6px 0; border-top: 1px solid var(--line); }
+  .customer-invoices-panel td { padding: 7px 14px; border: 0; display: flex; align-items: center; justify-content: space-between; gap: 14px; text-align: right; }
+  .customer-invoices-panel td::before { content: attr(data-label); flex: none; color: var(--ink-faint); font-size: 10px; font-weight: 600; text-align: left; }
+  .customer-invoices-panel td:first-child { display: flex; flex-wrap: wrap; justify-content: space-between; }
+  .customer-invoices-panel td:first-child strong { margin-left: auto; }
+  .customer-invoices-panel td:first-child .customer-invoice-number { width: 100%; text-align: right; }
   .report-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; }
   .report-metrics article { padding: 11px; }
   .report-metrics strong { font-size: 13px; }
@@ -5243,6 +5259,16 @@ td strong {
 @media (max-width: 740px) {
   .customer-detail-welcome { align-items: flex-start; flex-direction: column; gap: 14px; }
   .customer-profile-grid { grid-template-columns: 1fr; }
+  .customer-list-table thead { display: none; }
+  .customer-list-table,
+  .customer-list-table tbody,
+  .customer-list-table tr,
+  .customer-list-table td { display: block; width: 100%; }
+  .customer-list-table tr { padding: 6px 0; border-top: 1px solid #f0eee9; }
+  .customer-list-table td { padding: 7px 16px; border: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .customer-list-table td::before { content: attr(data-label); color: var(--ink-faint); font-size: 10px; font-weight: 600; }
+  .customer-list-table .customer-name { justify-content: flex-end; }
+  .customer-list-table .customer-name > span { display: none; }
 }
 
 @media (max-width: 600px) {

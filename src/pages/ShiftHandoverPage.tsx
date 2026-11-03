@@ -64,8 +64,8 @@ export function ShiftHandoverPage() {
       {!loading && !handovers.length && <p className="management-empty">Chưa có phiếu giao ca.</p>}
       {handovers.map((sheet) => <article className="handover-history-row" key={sheet.id}>
         <div><strong>{sheet.employeeName}</strong><small>{formatDateTime(sheet.openedAt)} — {sheet.closedAt ? formatDateTime(sheet.closedAt) : "Đang mở"}</small></div>
-        <span>{sheet.invoiceCount} hóa đơn<small>{formatMoney(sheet.revenueVnd)}</small></span>
-        <span className={sheet.closedAt ? "status done" : "status pending"}>{sheet.closedAt ? `Cuối ca ${formatMoney(sheet.closingCashVnd ?? 0)}` : "Đang mở"}</span>
+        <span data-label="Hóa đơn / doanh thu">{sheet.invoiceCount} hóa đơn<small>{formatMoney(sheet.revenueVnd)}</small></span>
+        <span data-label="Trạng thái"><span className={sheet.closedAt ? "status done" : "status pending"}>{sheet.closedAt ? `Cuối ca ${formatMoney(sheet.closingCashVnd ?? 0)}` : "Đang mở"}</span></span>
       </article>)}
     </section>
   </div>;
