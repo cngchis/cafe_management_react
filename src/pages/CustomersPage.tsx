@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { Icon } from "../components/Icon";
+import { collectOrderCredit, getOrder } from "../api/orders";
 import { createCustomer, getCustomerDetail, getCustomers, type Customer, type CustomerInvoice } from "../api/customers";
+import { InvoiceDetail, type Invoice } from "../components/InvoiceDetail";
 
 const formatMoney = (amount: number) => `${amount.toLocaleString("vi-VN")} ₫`;
-const invoiceStatus = (status: string) => status === "completed" ? "Hoàn thành" : status === "awaiting_payment" ? "Chờ thanh toán" : status;
+const invoiceStatus = (status: string) => status === "completed" ? "Hoàn thành" : status === "awaiting_payment" ? "Chờ thanh toán" : status === "cancelled" ? "Đã hủy" : status;
 const paymentMethodName: Record<string, string> = { cash: "Tiền mặt", bank_transfer: "Chuyển khoản", credit: "Công nợ", card: "Thẻ", other: "Khác" };
 
 export function CustomersPage() {
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [query, setQuery] = useState("");
   const [name, setName] = useState("");
@@ -18,6 +22,10 @@ export function CustomersPage() {
   const [customerInvoices, setCustomerInvoices] = useState<CustomerInvoice[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [selectedInvoiceRow, setSelectedInvoiceRow] = useState<CustomerInvoice | null>(null);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [invoiceError, setInvoiceError] = useState("");
   const load = () => getCustomers().then((result) => setCustomers(result.customers)).catch((cause) => setError(cause instanceof Error ? cause.message : "Không tải được khách hàng.")).finally(() => setLoading(false));
   useEffect(() => { void load(); }, []);
   const visibleCustomers = useMemo(() => customers.filter((customer) => `${customer.name} ${customer.phone ?? ""}`.toLowerCase().includes(query.toLowerCase())), [customers, query]);
@@ -34,6 +42,61 @@ export function CustomersPage() {
       setDetailError(cause instanceof Error ? cause.message : "Không tải được thông tin khách hàng.");
     } finally { setDetailLoading(false); }
   };
+  const openInvoice = async (invoiceRow: CustomerInvoice) => {
+    setSelectedInvoiceRow(invoiceRow);
+    setSelectedInvoice(null);
+    setInvoiceError("");
+    setInvoiceLoading(true);
+    try {
+      const order = await getOrder(invoiceRow.id);
+      const date = new Date(order.orderedAt);
+      const paymentNames = invoiceRow.paymentMethods.map((method) => paymentMethodName[method] ?? method);
+      setSelectedInvoice({
+        id: order.receiptCode,
+        recordId: order.id,
+        date: date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }),
+        time: date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false }),
+        customer: order.customerNameSnapshot || selectedCustomer?.name || "Khách lẻ",
+        total: order.totalVnd,
+        subtotal: order.subtotalVnd,
+        serviceFee: order.serviceFeeVnd,
+        paidAmount: order.paidAmountVnd,
+        creditAmount: invoiceRow.creditVnd,
+        discount: order.discountVnd,
+        status: order.status === "completed" ? "Hoàn thành" : order.status === "awaiting_payment" ? "Chờ thanh toán" : "Đã hủy",
+        paymentMethod: paymentNames.join(", ") || "Chưa thanh toán",
+        orderType: order.serviceLocation || order.orderType,
+        orderNumber: order.orderNumber,
+        guests: order.guestCount,
+        priceList: "Bảng giá chung",
+        branch: "Chi nhánh trung tâm",
+        cashier: order.cashierName || "—",
+        orderedAt: order.orderedAt,
+        items: order.items.map((item) => ({ name: item.name, portion: item.portion || "Phần", note: item.note || "", quantity: item.quantity, unitPrice: item.unitPriceVnd })),
+      });
+    } catch (cause) {
+      setInvoiceError(cause instanceof Error ? cause.message : "Không tải được chi tiết hóa đơn.");
+    } finally { setInvoiceLoading(false); }
+  };
+  const collectDebt = async (orderId: string) => {
+    const amount = await collectOrderCredit(orderId);
+    setSelectedInvoice((current) => current?.recordId === orderId ? {
+      ...current,
+      creditAmount: 0,
+      paidAmount: (current.paidAmount ?? 0) + amount,
+      paymentMethod: current.paymentMethod === "Chưa thanh toán" ? "Tiền mặt" : `${current.paymentMethod}, Tiền mặt`,
+    } : current);
+    setCustomerInvoices((current) => current.map((invoice) => invoice.id === orderId ? {
+      ...invoice,
+      creditVnd: 0,
+      paidVnd: invoice.paidVnd + amount,
+      paymentMethods: [...new Set([...invoice.paymentMethods, "cash"])],
+    } : invoice));
+    setSelectedCustomer((current) => current ? { ...current, creditVnd: Math.max(0, current.creditVnd - amount) } : current);
+    setCustomers((current) => current.map((customer) => customer.id === selectedCustomer?.id
+      ? { ...customer, creditVnd: Math.max(0, customer.creditVnd - amount) }
+      : customer));
+  };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setSaving(true); setError("");
@@ -45,6 +108,9 @@ export function CustomersPage() {
       setError(cause instanceof Error ? cause.message : "Không thể tạo khách hàng.");
     } finally { setSaving(false); }
   };
+
+  if (selectedInvoice) return <InvoiceDetail invoice={selectedInvoice} onBack={() => { setSelectedInvoice(null); setSelectedInvoiceRow(null); }} canCancel={false} onCancel={async () => undefined} onResume={(id) => navigate(`/pos?estimateId=${encodeURIComponent(id)}`)} onCollectDebt={collectDebt} />;
+  if (selectedInvoiceRow) return <div className="invoice-detail-page page-enter"><nav className="invoice-detail-nav" aria-label="Điều hướng chi tiết hóa đơn"><button className="invoice-back" aria-label="Quay lại khách hàng" onClick={() => { setSelectedInvoiceRow(null); setInvoiceError(""); }}><Icon name="chevron" size={28} /></button></nav><section className="invoice-detail-card" role={invoiceError ? "alert" : "status"}>{invoiceLoading ? "Đang tải chi tiết hóa đơn..." : <>{invoiceError}<button className="text-button" type="button" onClick={() => void openInvoice(selectedInvoiceRow)}>Thử lại</button></>}</section></div>;
 
   if (selectedCustomer) return <div className="dashboard page-enter">
     <section className="welcome management-welcome customer-detail-welcome">
@@ -58,8 +124,8 @@ export function CustomersPage() {
     <article className="panel orders-panel customer-invoices-panel">
       <div className="panel-heading"><div><h3>Hóa đơn khách hàng</h3><p>{customerInvoices.length} hóa đơn · bao gồm hóa đơn công nợ</p></div></div>
       {detailError && <div className="management-empty" role="alert">{detailError}<button className="text-button" type="button" onClick={() => void openCustomer(selectedCustomer)}>Thử lại</button></div>}
-      {detailLoading ? <div className="management-empty" role="status">Đang tải hóa đơn...</div> : !detailError && <div className="table-wrap"><table><thead><tr><th>MÃ HÓA ĐƠN</th><th>NGÀY</th><th>TRẠNG THÁI</th><th>THANH TOÁN</th><th>TỔNG TIỀN</th><th>ĐÃ THANH TOÁN</th><th>CÔNG NỢ</th></tr></thead><tbody>
-        {customerInvoices.map((invoice) => <tr key={invoice.id}><td data-label="Mã hóa đơn"><strong>{invoice.receiptCode}</strong><small className="customer-invoice-number">{invoice.orderNumber}</small></td><td data-label="Ngày">{new Date(invoice.orderedAt).toLocaleString("vi-VN")}</td><td data-label="Trạng thái"><span className={`status ${invoice.creditVnd > 0 ? "waiting" : invoice.status === "completed" ? "done" : ""}`}>{invoice.creditVnd > 0 ? "Còn công nợ" : invoiceStatus(invoice.status)}</span></td><td data-label="Thanh toán">{invoice.paymentMethods.map((method) => paymentMethodName[method] ?? method).join(", ") || "—"}</td><td data-label="Tổng tiền">{formatMoney(invoice.totalVnd)}</td><td data-label="Đã thanh toán">{formatMoney(invoice.paidVnd)}</td><td data-label="Công nợ" className={invoice.creditVnd > 0 ? "customer-invoice-debt" : ""}>{formatMoney(invoice.creditVnd)}</td></tr>)}
+      {detailLoading ? <div className="management-empty" role="status">Đang tải hóa đơn...</div> : !detailError && <div className="table-wrap"><table className="customer-invoices-table"><thead><tr><th>MÃ HÓA ĐƠN</th><th>TỔNG TIỀN</th><th>TRẠNG THÁI</th></tr></thead><tbody>
+        {customerInvoices.map((invoice) => <tr key={invoice.id} className="customer-click-row" onClick={() => void openInvoice(invoice)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); void openInvoice(invoice); } }} tabIndex={0} role="button" aria-label={`Mở hóa đơn ${invoice.receiptCode}`}><td data-label="Mã hóa đơn"><strong>{invoice.receiptCode}</strong></td><td data-label="Tổng tiền">{formatMoney(invoice.totalVnd)}</td><td data-label="Trạng thái"><span className={`status ${invoice.creditVnd > 0 ? "waiting" : invoice.status === "completed" ? "done" : ""}`}>{invoice.creditVnd > 0 ? "Còn công nợ" : invoiceStatus(invoice.status)}</span></td></tr>)}
       </tbody></table>{!customerInvoices.length && <div className="management-empty">Khách hàng chưa có hóa đơn.</div>}</div>}
     </article>
   </div>;

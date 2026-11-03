@@ -20,6 +20,7 @@ export type Invoice = {
   subtotal?: number;
   serviceFee?: number;
   paidAmount?: number;
+  creditAmount?: number;
   discount: number;
   status: string;
   paymentMethod: string;
@@ -39,15 +40,18 @@ type InvoiceDetailProps = {
   canCancel: boolean;
   onCancel: (id: string) => Promise<void>;
   onResume: (id: string) => void;
+  onCollectDebt?: (id: string) => Promise<void>;
 };
 
 const formatAmount = (amount: number) => amount.toLocaleString("en-US");
 
-export function InvoiceDetail({ invoice, onBack, canCancel, onCancel, onResume }: InvoiceDetailProps) {
+export function InvoiceDetail({ invoice, onBack, canCancel, onCancel, onResume, onCollectDebt }: InvoiceDetailProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState("");
+  const [isCollectingDebt, setIsCollectingDebt] = useState(false);
+  const [collectDebtError, setCollectDebtError] = useState("");
   const sheetRef = useRef<HTMLElement>(null);
   const itemCount = invoice.items.reduce((sum, item) => sum + item.quantity, 0);
   const paid = invoice.status === "Đã hủy" ? 0 : invoice.paidAmount ?? (invoice.status === "Hoàn thành" ? invoice.total : 0);
@@ -92,6 +96,19 @@ export function InvoiceDetail({ invoice, onBack, canCancel, onCancel, onResume }
     }
   };
 
+  const collectDebt = async () => {
+    if (!onCollectDebt || isCollectingDebt) return;
+    setIsCollectingDebt(true);
+    setCollectDebtError("");
+    try {
+      await onCollectDebt(invoice.recordId);
+    } catch (error) {
+      setCollectDebtError(error instanceof Error ? error.message : "Không thể thu công nợ.");
+    } finally {
+      setIsCollectingDebt(false);
+    }
+  };
+
   return <div className="invoice-detail-page page-enter">
     <nav className="invoice-detail-nav" aria-label="Điều hướng chi tiết hóa đơn">
       <button className="invoice-back" aria-label="Quay lại hóa đơn" onClick={onBack}><Icon name="chevron" size={28} /></button>
@@ -100,6 +117,7 @@ export function InvoiceDetail({ invoice, onBack, canCancel, onCancel, onResume }
     <section className="invoice-detail-card invoice-detail-header">
       <div className="invoice-detail-heading"><div><h2>{invoice.id}</h2><time>{invoice.date} {invoice.time}</time></div><span className={`invoice-paid${invoice.status === "Đã hủy" ? " cancelled" : ""}`}>{invoice.status}</span></div>
       {invoice.status === "Chờ thanh toán" && <button className="primary-button invoice-resume" type="button" onClick={() => onResume(invoice.recordId)}>Mở POS để thanh toán</button>}
+      {invoice.creditAmount ? <><button className="primary-button invoice-resume" type="button" disabled={isCollectingDebt} onClick={() => void collectDebt()}>{isCollectingDebt ? "Đang ghi nhận..." : `Thu công nợ ${formatAmount(invoice.creditAmount)} ₫ bằng tiền mặt`}</button>{collectDebtError && <p className="payment-error" role="alert">{collectDebtError}</p>}</> : null}
     </section>
     <section className="invoice-detail-card invoice-customer">
       <span className="invoice-customer-icon"><Icon name="users" size={24} /></span><strong>{invoice.customer}</strong>

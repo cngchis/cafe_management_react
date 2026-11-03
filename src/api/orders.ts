@@ -85,6 +85,16 @@ export async function updateEstimate(id: string, input: { customerId: string | n
   if (!response.ok) await readResponse<void>(response);
 }
 
+export async function collectOrderCredit(id: string): Promise<number> {
+  const response = await fetch(`/api/orders/${id}/collect-credit`, {
+    method: "POST",
+    headers: { "idempotency-key": crypto.randomUUID() },
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(body?.error?.message ?? "Không thể thu công nợ hóa đơn.");
+  return body.collection.collectedVnd as number;
+}
+
 export async function getOrders(): Promise<OrderRecord[]> {
   const response = await fetch("/api/orders");
   return (await readResponse<{ orders: OrderRecord[] }>(response)).orders;

@@ -287,6 +287,49 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
     return { success: true };
   });
 
+  app.post<{ Params: { id: string }; Headers: { "idempotency-key"?: string } }>("/orders/:id/collect-credit", {
+    schema: {
+      headers: { type: "object", properties: { "idempotency-key": { type: "string", format: "uuid" } } },
+      params: { type: "object", required: ["id"], properties: { id: { type: "string", format: "uuid" } } },
+    },
+  }, async (request, reply) => {
+    const account = await getSessionAccount(request);
+    if (!account) return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lòng đăng nhập." } });
+    const idempotencyKey = request.headers["idempotency-key"];
+    if (!idempotencyKey) return reply.code(400).send({ error: { code: "IDEMPOTENCY_KEY_REQUIRED", message: "Thiếu mã yêu cầu thu công nợ." } });
+    const result = await db.transaction(async (tx) => {
+      const [order] = await tx.select({ id: orders.id, orderNumber: orders.orderNumber, status: orders.status })
+        .from(orders).where(eq(orders.id, request.params.id)).for("update").limit(1);
+      if (!order) throw Object.assign(new Error("Không tìm thấy hóa đơn."), { statusCode: 404, code: "ORDER_NOT_FOUND" });
+      const [previousCollection] = await tx.select({ amountVnd: payments.amountVnd }).from(payments)
+        .where(and(eq(payments.orderId, order.id), eq(payments.externalReference, idempotencyKey), eq(payments.status, "completed"))).limit(1);
+      if (previousCollection) return { collectedVnd: previousCollection.amountVnd };
+      if (order.status !== "completed") throw Object.assign(new Error("Chỉ hóa đơn đã hoàn tất mới có thể thu công nợ."), { statusCode: 409, code: "ORDER_NOT_COLLECTIBLE" });
+      const [credit] = await tx.select({ id: payments.id, amountVnd: payments.amountVnd }).from(payments)
+        .where(and(eq(payments.orderId, order.id), eq(payments.method, "credit"), eq(payments.status, "pending"))).for("update").limit(1);
+      if (!credit || credit.amountVnd <= 0) throw Object.assign(new Error("Hóa đơn không còn công nợ."), { statusCode: 409, code: "NO_OUTSTANDING_CREDIT" });
+      await tx.insert(cashAccounts).values({ name: "Tiền mặt", accountType: "cash" }).onConflictDoNothing();
+      const [cashAccount] = await tx.select({ id: cashAccounts.id }).from(cashAccounts).where(eq(cashAccounts.name, "Tiền mặt")).limit(1);
+      const [payment] = await tx.insert(payments).values({
+        orderId: order.id, amountVnd: credit.amountVnd, method: "cash", status: "completed", externalReference: idempotencyKey,
+      }).returning({ id: payments.id });
+      const now = new Date();
+      await tx.insert(cashbookEntries).values({
+        cashAccountId: cashAccount.id, paymentId: payment.id, referenceCode: `CN${crypto.randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase()}`,
+        direction: "in", title: "Thu công nợ khách hàng", category: "Thu công nợ", counterpartyGroup: "Khách hàng",
+        counterpartyName: "Khách hàng", description: `Thu công nợ hóa đơn ${order.orderNumber}`,
+        amountVnd: credit.amountVnd, createdByName: account.displayName, occurredAt: now,
+      });
+      await tx.update(payments).set({ status: "failed" }).where(eq(payments.id, credit.id));
+      await tx.insert(auditLogs).values({
+        accountId: account.id, actorName: account.displayName, action: "credit_collected", entityType: "order", entityId: order.id,
+        summary: `Đã thu ${credit.amountVnd} VND công nợ hóa đơn ${order.orderNumber}.`,
+      });
+      return { collectedVnd: credit.amountVnd };
+    });
+    return { collection: result };
+  });
+
   app.delete<{ Params: { id: string } }>("/orders/:id", {
     schema: {
       params: { type: "object", required: ["id"], properties: { id: { type: "string", format: "uuid" } } },
