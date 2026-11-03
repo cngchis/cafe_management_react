@@ -5,7 +5,7 @@ import { Icon } from "../components/Icon";
 import { CartPanel } from "../components/CartPanel";
 import { formatMoney, type Product } from "../data/products";
 import { getProducts } from "../api/products";
-import { cancelOrder, createOrder, deleteEstimate as removeEstimate, getOrder, getOrders, payOrder, type OrderDetailRecord, type OrderRecord } from "../api/orders";
+import { cancelOrder, createOrder, deleteEstimate as removeEstimate, getOrder, getOrders, payOrder, updateEstimate, type OrderDetailRecord, type OrderRecord } from "../api/orders";
 import { getPriceListTargets, type CustomerTarget } from "../api/moreOperations";
 import { createCustomer } from "../api/customers";
 import { getBankAccounts, type BankAccount } from "../api/cashbook";
@@ -73,6 +73,16 @@ export function PosPage() {
     navigate("/pos");
     setSuccessNotice({ title: "Thanh toán thành công", detail: `Đơn ${orderNumber} đã được thanh toán.` });
     return orderNumber;
+  };
+
+  const saveEstimateDetails = async (id: string, input: { customerId: string | null; note: string }) => {
+    await updateEstimate(id, input);
+    setEstimate((current) => current?.id === id ? {
+      ...current,
+      customerId: input.customerId,
+      customerNameSnapshot: customers.find((customer) => customer.id === input.customerId)?.name ?? null,
+      orderNote: input.note.trim() || null,
+    } : current);
   };
 
   useEffect(() => {
@@ -174,7 +184,7 @@ export function PosPage() {
     {createPortal(<>
       <button className="cart-toggle" aria-label={`Giỏ hàng, ${cartCount} món`} aria-controls="cart-panel" aria-expanded={cartOpen} onClick={() => setCartOpen(true)}><Icon name="cart" size={22} /><b className="cart-count">{cartCount}</b></button>
       {successNotice && <div key={`${successNotice.title}-${successNotice.detail}`} className="pos-success-notice" role="status" aria-live="polite"><span className="pos-success-icon"><Icon name="check" size={22} /></span><span><strong>{successNotice.title}</strong><small>{successNotice.detail}</small></span></div>}
-      {(cartOpen || Boolean(estimateId)) && <div className="cart-overlay">{!estimateId && <button className="cart-backdrop" type="button" aria-label="Đóng giỏ hàng" onClick={() => setCartOpen(false)} />}<CartPanel items={estimateId ? [] : cartItems} customers={customers} customerId={customerId} bankAccount={defaultBankAccount} estimate={estimate} estimateLoading={estimateLoading} estimateError={estimateError} initialOrderType={initialOrderType} onCustomerChange={setCustomerId} onCustomerCreated={(customer) => setCustomers((current) => [...current, customer].sort((a, b) => a.name.localeCompare(b.name, "vi")))} onUpdateCart={updateCart} onClearCart={() => setCart({})} onClose={() => { if (estimateId) { setCartOpen(false); navigate("/pos"); } else setCartOpen(false); }} onComplete={completeOrder} onPayEstimate={settleEstimate} onDeleteEstimate={deleteEstimate} /></div>}
+      {(cartOpen || Boolean(estimateId)) && <div className="cart-overlay">{!estimateId && <button className="cart-backdrop" type="button" aria-label="Đóng giỏ hàng" onClick={() => setCartOpen(false)} />}<CartPanel items={estimateId ? [] : cartItems} customers={customers} customerId={customerId} bankAccount={defaultBankAccount} estimate={estimate} estimateLoading={estimateLoading} estimateError={estimateError} initialOrderType={initialOrderType} onCustomerChange={setCustomerId} onCustomerCreated={(customer) => setCustomers((current) => [...current, customer].sort((a, b) => a.name.localeCompare(b.name, "vi")))} onUpdateCart={updateCart} onClearCart={() => setCart({})} onClose={() => { if (estimateId) { setCartOpen(false); navigate("/pos"); } else setCartOpen(false); }} onComplete={completeOrder} onPayEstimate={settleEstimate} onUpdateEstimate={saveEstimateDetails} onDeleteEstimate={deleteEstimate} /></div>}
     </>, document.body)}
   </div>;
 }

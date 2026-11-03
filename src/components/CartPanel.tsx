@@ -24,10 +24,11 @@ type CartPanelProps = {
   onClose: () => void;
   onComplete: (orderType: "dine_in" | "takeaway" | "delivery", note: string, idempotencyKey: string, payment: { mode?: "payment" | "estimate"; amountReceivedVnd: number; paymentMethod: "cash" | "bank_transfer"; customerName: string; customerId?: string; discountVnd: number; transferReference?: string; bankAccountId?: string }) => Promise<string>;
   onPayEstimate: (id: string, input: { amountReceivedVnd: number; paymentMethod: "cash" | "bank_transfer"; transferReference?: string; bankAccountId?: string }, idempotencyKey: string) => Promise<string>;
+  onUpdateEstimate: (id: string, input: { customerId: string | null; note: string }) => Promise<void>;
   onDeleteEstimate: (id: string) => Promise<void>;
 };
 
-export function CartPanel({ items, customers, customerId, bankAccount, estimate, estimateLoading, estimateError, initialOrderType, onCustomerChange, onCustomerCreated, onUpdateCart, onClearCart, onClose, onComplete, onPayEstimate, onDeleteEstimate }: CartPanelProps) {
+export function CartPanel({ items, customers, customerId, bankAccount, estimate, estimateLoading, estimateError, initialOrderType, onCustomerChange, onCustomerCreated, onUpdateCart, onClearCart, onClose, onComplete, onPayEstimate, onUpdateEstimate, onDeleteEstimate }: CartPanelProps) {
   const [orderType, setOrderType] = useState(initialOrderType);
   const [orderNote, setOrderNote] = useState("");
   const [paid, setPaid] = useState(false);
@@ -35,6 +36,7 @@ export function CartPanel({ items, customers, customerId, bankAccount, estimate,
   const [paidOrderNumber, setPaidOrderNumber] = useState("");
   const [paymentError, setPaymentError] = useState("");
   const [isPaying, setIsPaying] = useState(false);
+  const [isSavingEstimate, setIsSavingEstimate] = useState(false);
   const [amountReceived, setAmountReceived] = useState("");
   const [tenderEdited, setTenderEdited] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "bank_transfer">("cash");
@@ -55,6 +57,9 @@ export function CartPanel({ items, customers, customerId, bankAccount, estimate,
   const total = estimate?.totalVnd ?? subtotal - appliedDiscountVnd;
   const hasOrderItems = estimate ? estimate.items.length > 0 : items.length > 0;
   useEffect(() => {
+    if (estimate) setOrderNote(estimate.orderNote ?? "");
+  }, [estimate?.id, estimate?.orderNote]);
+  useEffect(() => {
     if (discountMode !== "percent" || discountInput === "") return;
     const percent = Number(discountInput);
     if (Number.isFinite(percent) && percent >= 0) setDiscountVnd(Math.round(subtotal * Math.min(percent, 100) / 100));
@@ -69,6 +74,7 @@ export function CartPanel({ items, customers, customerId, bankAccount, estimate,
   const creditVnd = Math.max(0, total - receivedVnd);
   const changeVnd = Math.max(0, receivedVnd - total);
   const selectedCustomer = customers.find((customer) => customer.id === customerId);
+  const estimateCustomer = customers.find((customer) => customer.id === estimate?.customerId);
   const effectiveCustomerName = selectedCustomer?.name ?? "";
   const completePayment = async (reference?: string, mode: "payment" | "estimate" = "payment") => {
     if (!hasOrderItems || isPaying) return;
@@ -144,6 +150,20 @@ export function CartPanel({ items, customers, customerId, bankAccount, estimate,
     } finally { setIsCreatingCustomer(false); }
   };
 
+  const saveEstimateDetails = async (nextCustomerId: string | null, note: string) => {
+    if (!estimate || isSavingEstimate) return;
+    setIsSavingEstimate(true);
+    setPaymentError("");
+    try {
+      await onUpdateEstimate(estimate.id, { customerId: nextCustomerId, note });
+      setActiveSheet(null);
+    } catch (error) {
+      setPaymentError(error instanceof Error ? error.message : "Không thể cập nhật hóa đơn tạm tính.");
+    } finally {
+      setIsSavingEstimate(false);
+    }
+  };
+
   const applyDiscount = () => {
     const value = Number(discountInput);
     if (!Number.isFinite(value) || value < 0) return;
@@ -169,15 +189,16 @@ export function CartPanel({ items, customers, customerId, bankAccount, estimate,
 
   return <aside id="cart-panel" className="cart-panel" role="dialog" aria-modal="true" aria-label={estimate ? "Thanh toán hóa đơn tạm tính" : "Giỏ hàng"}>
     <div className="cart-head"><div><h2>{estimate ? "HÓA ĐƠN TẠM TÍNH" : "ĐƠN HIỆN TẠI"}</h2></div><div className="cart-head-actions"><button className="icon-button" disabled={isPaying || Boolean(estimate && estimateLoading)} onClick={() => estimate ? setConfirmDeleteEstimate(true) : onClearCart()} aria-label={estimate ? "Xóa hóa đơn tạm tính" : "Xóa đơn"}><Icon name="trash" size={18} /></button><button className="icon-button" disabled={isPaying} onClick={onClose} aria-label={estimate ? "Quay lại POS" : "Đóng giỏ hàng"}><Icon name="close" size={18} /></button></div></div>
-    {!estimate && <div className="cart-quick-actions">
-      <button type="button" disabled={isPaying} onClick={() => setActiveSheet("customer")}><Icon name="users" size={17} /><span>{selectedCustomer?.name ?? "Khách lẻ"}</span></button>
-      <button type="button" disabled={isPaying} onClick={() => setActiveSheet("note")}><Icon name="receipt" size={17} /><span>{orderNote ? "Có ghi chú" : "Ghi chú"}</span></button>
-    </div>}
-    {!estimate && activeSheet && <div className="cart-sheet-layer" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveSheet(null); }}><section className="cart-bottom-sheet" role="dialog" aria-modal="true" aria-label={activeSheet === "customer" ? "Chọn khách hàng" : activeSheet === "createCustomer" ? "Tạo khách hàng" : "Ghi chú đơn hàng"}>
+    <div className="cart-quick-actions">
+      <button type="button" disabled={isPaying || isSavingEstimate || (estimate && estimateLoading)} onClick={() => setActiveSheet("customer")}><Icon name="users" size={17} /><span>{(estimate ? estimateCustomer?.name ?? estimate?.customerNameSnapshot : selectedCustomer?.name) ?? "Khách lẻ"}</span></button>
+      <button type="button" disabled={isPaying || isSavingEstimate} onClick={() => setActiveSheet("note")}><Icon name="receipt" size={17} /><span>{orderNote ? "Có ghi chú" : "Ghi chú"}</span></button>
+    </div>
+    {activeSheet && <div className="cart-sheet-layer" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveSheet(null); }}><section className="cart-bottom-sheet" role="dialog" aria-modal="true" aria-label={activeSheet === "customer" ? "Chọn khách hàng" : activeSheet === "createCustomer" ? "Tạo khách hàng" : "Ghi chú đơn hàng"}>
       <div className="cart-sheet-heading"><h3>{activeSheet === "customer" ? "Khách hàng" : activeSheet === "createCustomer" ? "Tạo khách hàng" : "Ghi chú"}</h3><button type="button" className="icon-button" onClick={() => setActiveSheet(null)} aria-label="Đóng"><Icon name="close" size={18} /></button></div>
-      {activeSheet === "customer" && <div className="cart-sheet-options"><button type="button" className={!customerId ? "selected" : ""} onClick={() => { onCustomerChange(""); setActiveSheet(null); }}>Khách lẻ · Giá chung</button>{customers.map((customer) => <button type="button" className={customer.id === customerId ? "selected" : ""} key={customer.id} onClick={() => { onCustomerChange(customer.id); setActiveSheet(null); }}>{customer.name}{customer.phone ? ` · ${customer.phone}` : ""}</button>)}<button type="button" className="cart-sheet-create" onClick={() => setActiveSheet("createCustomer")}>+ Tạo khách hàng mới</button></div>}
+      {activeSheet === "customer" && <div className="cart-sheet-options"><button type="button" className={!(estimate ? estimate.customerId : customerId) ? "selected" : ""} disabled={isSavingEstimate} onClick={() => estimate ? void saveEstimateDetails(null, orderNote) : (onCustomerChange(""), setActiveSheet(null))}>Khách lẻ · Giá chung</button>{customers.map((customer) => <button type="button" className={customer.id === (estimate ? estimate.customerId : customerId) ? "selected" : ""} disabled={isSavingEstimate} key={customer.id} onClick={() => estimate ? void saveEstimateDetails(customer.id, orderNote) : (onCustomerChange(customer.id), setActiveSheet(null))}>{customer.name}{customer.phone ? ` · ${customer.phone}` : ""}</button>)}{!estimate && <button type="button" className="cart-sheet-create" onClick={() => setActiveSheet("createCustomer")}>+ Tạo khách hàng mới</button>}</div>}
       {activeSheet === "createCustomer" && <form className="pos-create-customer" onSubmit={(event) => void addCustomer(event)}><label className="setting-field"><span>Tên khách hàng</span><input required autoFocus maxLength={200} value={newCustomerName} onChange={(event) => setNewCustomerName(event.target.value)} /></label><label className="setting-field"><span>Số điện thoại (không bắt buộc)</span><input maxLength={32} value={newCustomerPhone} onChange={(event) => setNewCustomerPhone(event.target.value)} /></label><button className="primary-button" type="submit" disabled={isCreatingCustomer}>{isCreatingCustomer ? "Đang lưu..." : "Lưu khách hàng"}</button></form>}
-      {activeSheet === "note" && <div className="cart-sheet-note"><textarea autoFocus disabled={isPaying} maxLength={2000} value={orderNote} onChange={(event) => setOrderNote(event.target.value)} placeholder="Nhập ghi chú cho đơn hàng..." /><button className="primary-button" type="button" onClick={() => setActiveSheet(null)}>Lưu ghi chú</button></div>}
+      {activeSheet === "note" && <div className="cart-sheet-note"><textarea autoFocus disabled={isPaying || isSavingEstimate} maxLength={2000} value={orderNote} onChange={(event) => setOrderNote(event.target.value)} placeholder="Nhập ghi chú cho đơn hàng..." /><button className="primary-button" type="button" disabled={isSavingEstimate} onClick={() => estimate ? void saveEstimateDetails(estimate.customerId, orderNote) : setActiveSheet(null)}>{isSavingEstimate ? "Đang lưu..." : "Lưu ghi chú"}</button></div>}
+      {paymentError && <p className="payment-error" role="alert">{paymentError}</p>}
     </section></div>}
     <div className="cart-items">
       {estimateLoading ? <div className="cart-empty" role="status"><strong>Đang tải hóa đơn tạm tính...</strong></div> : estimateError ? <div className="cart-empty" role="alert"><strong>{estimateError}</strong></div> : estimate ? estimate.items.map((item, index) => <div className="cart-item estimate-cart-item" key={`${item.productId ?? item.name}-${index}`}><div className="estimate-cart-item-icon"><Icon name="coffee" /></div><div className="cart-item-main"><div><strong>{item.name}</strong><span>{item.portion || "Phần"}{item.note ? ` · ${item.note}` : ""}</span></div><div className="cart-item-bottom"><b>{formatMoney(item.lineTotalVnd)}</b><span className="estimate-cart-quantity">× {item.quantity}</span></div></div></div>) : items.length ? items.map((item) => <div className="cart-item" key={item.id}><img src={item.image} alt="" /><div className="cart-item-main"><div><strong>{item.name}</strong><span>Size M · Ít đá</span></div><div className="cart-item-bottom"><b>{formatMoney(item.price * item.quantity)}</b><div className="stepper"><button disabled={isPaying} onClick={() => onUpdateCart(item.id, -1)}><Icon name="minus" size={14} /></button><span>{item.quantity}</span><button disabled={isPaying} onClick={() => onUpdateCart(item.id, 1)}><Icon name="plus" size={14} /></button></div></div></div></div>) : <div className="cart-empty"><div><Icon name="coffee" /></div><strong>Đơn hàng trống</strong><span>Chọn món từ thực đơn để bắt đầu</span></div>}

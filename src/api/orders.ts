@@ -34,6 +34,9 @@ export type OrderRecord = {
 };
 
 export type OrderDetailRecord = OrderRecord & {
+  customerId: string | null;
+  customerNameSnapshot: string | null;
+  orderNote: string | null;
   items: Array<{
     productId: string | null;
     name: string;
@@ -71,6 +74,15 @@ export async function payOrder(id: string, input: { amountReceivedVnd: number; p
   const body = await response.json().catch(() => null);
   if (!response.ok) throw new Error(body?.error?.message ?? "Không thể thanh toán đơn tạm tính.");
   return body.order.orderNumber as string;
+}
+
+export async function updateEstimate(id: string, input: { customerId: string | null; note: string }): Promise<void> {
+  const response = await fetch(`/api/orders/${id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) await readResponse<void>(response);
 }
 
 export async function getOrders(): Promise<OrderRecord[]> {

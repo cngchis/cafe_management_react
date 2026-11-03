@@ -1,8 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { getSessionAccount } from "../auth/session.js";
-import { auditLogs, customers } from "../db/schema.js";
+import { auditLogs, customers, orders, payments } from "../db/schema.js";
 
 export const customerRoutes: FastifyPluginAsync = async (app) => {
   app.get("/customers", async (request, reply) => {
@@ -11,8 +11,44 @@ export const customerRoutes: FastifyPluginAsync = async (app) => {
     const rows = await db.select({
       id: customers.id, name: customers.name, phone: customers.phone,
       points: customers.pointsBalance, tier: customers.membershipTier,
-    }).from(customers).where(eq(customers.isActive, true)).orderBy(asc(customers.name)).limit(1000);
+      creditVnd: sql<number>`coalesce(sum(${payments.amountVnd}) filter (where ${payments.method} = 'credit' and ${payments.status} = 'pending'), 0)`.mapWith(Number),
+    }).from(customers)
+      .leftJoin(orders, and(eq(orders.customerId, customers.id), eq(orders.status, "completed")))
+      .leftJoin(payments, eq(payments.orderId, orders.id))
+      .where(eq(customers.isActive, true)).groupBy(customers.id).orderBy(asc(customers.name)).limit(1000);
     return { customers: rows };
+  });
+
+  app.get<{ Params: { id: string } }>("/customers/:id", {
+    schema: { params: { type: "object", required: ["id"], properties: { id: { type: "string", format: "uuid" } } } },
+  }, async (request, reply) => {
+    const account = await getSessionAccount(request);
+    if (!account) return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lòng đăng nhập." } });
+    const [customer] = await db.select({
+      id: customers.id, name: customers.name, phone: customers.phone,
+      points: customers.pointsBalance, tier: customers.membershipTier,
+      creditVnd: sql<number>`coalesce(sum(${payments.amountVnd}) filter (where ${payments.method} = 'credit' and ${payments.status} = 'pending'), 0)`.mapWith(Number),
+    }).from(customers)
+      .leftJoin(orders, and(eq(orders.customerId, customers.id), eq(orders.status, "completed")))
+      .leftJoin(payments, eq(payments.orderId, orders.id))
+      .where(eq(customers.id, request.params.id)).groupBy(customers.id).limit(1);
+    if (!customer) return reply.code(404).send({ error: { code: "CUSTOMER_NOT_FOUND", message: "Không tìm thấy khách hàng." } });
+
+    const invoices = await db.select({
+      id: orders.id,
+      orderNumber: orders.orderNumber,
+      receiptCode: orders.receiptCode,
+      orderType: orders.orderType,
+      status: orders.status,
+      orderedAt: orders.orderedAt,
+      totalVnd: orders.totalVnd,
+      paidVnd: sql<number>`coalesce(sum(${payments.amountVnd}) filter (where ${payments.status} = 'completed'), 0)`.mapWith(Number),
+      creditVnd: sql<number>`coalesce(sum(${payments.amountVnd}) filter (where ${payments.method} = 'credit' and ${payments.status} = 'pending'), 0)`.mapWith(Number),
+      paymentMethods: sql<string[]>`coalesce(array_agg(distinct ${payments.method}) filter (where ${payments.method} is not null), ARRAY[]::text[])`,
+    }).from(orders).leftJoin(payments, eq(payments.orderId, orders.id))
+      .where(and(eq(orders.customerId, customer.id), inArray(orders.status, ["completed", "awaiting_payment", "cancelled"])))
+      .groupBy(orders.id).orderBy(desc(orders.orderedAt));
+    return { customer, invoices };
   });
 
   app.post<{ Body: { name: string; phone?: string } }>("/customers", {

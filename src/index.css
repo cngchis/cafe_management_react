@@ -838,6 +838,23 @@ td strong {
   font-weight: 700;
 }
 
+.customer-click-row { cursor: pointer; }
+.customer-click-row:hover { background: #f8faf8; }
+.customer-click-row:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.customer-invoice-debt { color: #b42318; font-weight: 700; }
+.customer-detail-welcome { align-items: flex-end; }
+.customer-detail-back { margin: 0 0 12px; padding: 0; border: 0; display: flex; align-items: center; gap: 5px; color: var(--brand); background: transparent; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.customer-credit-total { color: #b42318; font-size: 14px; }
+.customer-profile-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(220px, .8fr); gap: 16px; }
+.customer-profile-card, .customer-credit-card { display: grid; gap: 12px; padding: 20px; }
+.customer-profile-card > span, .customer-credit-card > span { color: var(--ink-faint); font-size: 10px; }
+.customer-profile-card > strong { color: var(--ink); font-size: 17px; }
+.customer-profile-card > div { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding-top: 9px; font-size: 12px; }
+.customer-profile-card > div span, .customer-credit-card small { color: var(--ink-soft); }
+.customer-credit-card > strong { color: #b42318; font: 750 22px "Manrope", sans-serif; }
+.customer-invoices-panel .table-wrap { overflow-x: auto; }
+.customer-invoice-number { display: block; margin-top: 3px; color: var(--ink-faint); font-size: 9px; }
+
 .management-empty {
   padding: 32px;
   color: var(--ink-faint);
@@ -4953,8 +4970,12 @@ td strong {
   }
 
   .primary-button {
-    font-size: 0;
+    font-size: 12px;
   }
+
+  .pay-button { min-width: 0; gap: 8px; }
+  .pay-button span { min-width: 0; white-space: nowrap; }
+  .pay-button strong { flex: none; white-space: nowrap; }
 
   .employee-create-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5217,6 +5238,11 @@ td strong {
   .pos-service-card small, .pos-service-status { font-size: 11px; }
   .service-table-form { grid-template-columns: 1fr; }
   .service-table-form .primary-button { width: 100%; }
+}
+
+@media (max-width: 740px) {
+  .customer-detail-welcome { align-items: flex-start; flex-direction: column; gap: 14px; }
+  .customer-profile-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 600px) {

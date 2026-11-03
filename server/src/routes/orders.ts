@@ -110,6 +110,9 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
       serviceLocation: orders.serviceLocation,
       guestCount: orders.guestCount,
       cashierName: orders.cashierName,
+      customerId: orders.customerId,
+      customerNameSnapshot: orders.customerNameSnapshot,
+      orderNote: orders.orderNote,
       subtotalVnd: orders.subtotalVnd,
       discountVnd: orders.discountVnd,
       serviceFeeVnd: orders.serviceFeeVnd,
@@ -239,6 +242,49 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
       return { orderNumber: order.orderNumber };
     });
     return { order: result };
+  });
+
+  app.patch<{ Params: { id: string }; Body: { customerId: string | null; note: string } }>("/orders/:id", {
+    schema: {
+      params: { type: "object", required: ["id"], properties: { id: { type: "string", format: "uuid" } } },
+      body: {
+        type: "object", additionalProperties: false, required: ["customerId", "note"],
+        properties: {
+          customerId: { anyOf: [{ type: "string", format: "uuid" }, { type: "null" }] },
+          note: { type: "string", maxLength: 2000 },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const account = await getSessionAccount(request);
+    if (!account) return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lòng đăng nhập." } });
+    await db.transaction(async (tx) => {
+      const [order] = await tx.select({ id: orders.id, orderNumber: orders.orderNumber, status: orders.status, cashierAccountId: orders.cashierAccountId })
+        .from(orders).where(eq(orders.id, request.params.id)).for("update").limit(1);
+      if (!order) throw Object.assign(new Error("Không tìm thấy đơn tạm tính."), { statusCode: 404, code: "ORDER_NOT_FOUND" });
+      if (account.role === "cashier" && order.cashierAccountId !== account.id) {
+        throw Object.assign(new Error("Bạn không có quyền sửa đơn tạm tính này."), { statusCode: 403, code: "FORBIDDEN" });
+      }
+      if (order.status !== "awaiting_payment") {
+        throw Object.assign(new Error("Chỉ có thể sửa khách hàng và ghi chú của đơn tạm tính chưa thanh toán."), { statusCode: 409, code: "ORDER_NOT_ESTIMATE" });
+      }
+      const [customer] = request.body.customerId ? await tx.select({ id: customers.id, name: customers.name })
+        .from(customers).where(and(eq(customers.id, request.body.customerId), eq(customers.isActive, true))).limit(1) : [];
+      if (request.body.customerId && !customer) {
+        throw Object.assign(new Error("Không tìm thấy khách hàng đang hoạt động."), { statusCode: 409, code: "CUSTOMER_UNAVAILABLE" });
+      }
+      await tx.update(orders).set({
+        customerId: customer?.id ?? null,
+        customerNameSnapshot: customer?.name ?? null,
+        orderNote: request.body.note.trim() || null,
+        updatedAt: new Date(),
+      }).where(eq(orders.id, order.id));
+      await tx.insert(auditLogs).values({
+        accountId: account.id, actorName: account.displayName, action: "updated", entityType: "order", entityId: order.id,
+        summary: `Cập nhật khách hàng hoặc ghi chú đơn tạm tính ${order.orderNumber}.`,
+      });
+    });
+    return { success: true };
   });
 
   app.delete<{ Params: { id: string } }>("/orders/:id", {
