@@ -1796,6 +1796,7 @@ td strong {
   .schedule-week-grid { min-width: 0; grid-template-columns: 1fr; }
   .schedule-day { min-height: 0; border-right: 0; border-bottom: 1px solid var(--line); }
   .schedule-day h3 { padding: 12px 14px; text-align: left; }
+  .schedule-day .schedule-empty { display: none; }
   .customer-invoices-panel .table-wrap { overflow: visible; }
   .customer-invoices-panel table,
   .customer-invoices-panel tbody,
