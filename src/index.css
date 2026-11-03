@@ -5088,14 +5088,20 @@ td strong {
 
   .pos-actions {
     width: auto;
-    flex: 0 0 auto;
+    min-width: 0;
+    flex: 1 1 auto;
+    justify-content: flex-end;
     gap: 7px;
   }
 
-  .pos-search-box.is-open { width: min(180px, 38vw); }
+  .pos-heading.search-open { gap: 0; }
+  .pos-heading-context.search-open { gap: 0; }
+  .pos-actions.search-open { gap: 0; }
+  .pos-search-box.is-open { width: min(180px, calc(100% - 36px)); flex: 1 1 auto; }
   .pos-search-box, .pos-estimates-button { width: 36px; height: 36px; }
   .pos-search-box button { width: 36px; height: 34px; flex-basis: 36px; }
   .pos-heading-context { gap: 7px; }
+  .pos-heading-context.search-open .eyebrow { display: none; }
   .pos-back-button { width: 32px; height: 32px; }
   .pos-heading-context .eyebrow { font-size: 10px; letter-spacing: .8px; }
 
