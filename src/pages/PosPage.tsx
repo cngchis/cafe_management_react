@@ -111,6 +111,10 @@ export function PosPage() {
   };
 
   useEffect(() => {
+    if (searchParams.get("showEstimates") === "1") void openEstimateList();
+  }, [searchParams]);
+
+  useEffect(() => {
     if (!estimateId) { setEstimate(null); setEstimateError(""); return; }
     setCartOpen(true);
     setEstimateLoading(true);

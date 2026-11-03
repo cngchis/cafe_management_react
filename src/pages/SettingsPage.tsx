@@ -39,7 +39,6 @@ export function SettingsPage({ role }: { role: Account["role"] }) {
       <div className="settings-fields">
         <label className="setting-field"><span>Tên cửa hàng</span><input value={storeName} onChange={(event) => { setStoreName(event.target.value); setSaved(false); }} /></label>
         <label className="setting-field"><span>Số điện thoại</span><input value={phone} onChange={(event) => { setPhone(event.target.value); setSaved(false); }} /></label>
-        <label className="setting-field"><span>Phí dịch vụ (%)</span><input type="number" min="0" max="100" value={serviceFee} onChange={(event) => { setServiceFee(event.target.value); setSaved(false); }} /></label>
         <label className="setting-toggle"><span><strong>Thông báo đơn hàng</strong><small>Nhận thông báo khi có đơn mới.</small></span><input type="checkbox" checked={notifications} onChange={(event) => setNotifications(event.target.checked)} /></label>
       </div>
       <div className="settings-footer"><span role="status">{saved && <><Icon name="check" size={16} /> Đã lưu thay đổi</>}</span><button className="primary-button" type="submit">Lưu cài đặt</button></div>

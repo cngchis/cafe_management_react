@@ -71,7 +71,6 @@ export function DashboardPage({ goPos, canViewActivity = true }: { goPos: () => 
       <div><span className="eyebrow"><Icon name="spark" size={15} /> TỔNG QUAN HÔM NAY</span><h2>Hoạt động cửa hàng</h2><p>{today?.orderCount ?? 0} đơn hoàn tất · {formatMoney(today?.revenueVnd ?? 0)} doanh thu.</p></div>
       <div className="dashboard-welcome-actions">
         {canViewActivity && <button className="dashboard-notifications-button" type="button" aria-label="Thông báo và lịch sử thao tác" title="Thông báo" onClick={() => void openActivity()}><Icon name="bell" size={19} /></button>}
-        <button className="primary-button" onClick={goPos}><Icon name="plus" /> Tạo đơn hàng</button>
       </div>
     </section>
     {error && <div className="dashboard-data-error" role="alert"><span>{error}</span><button type="button" onClick={() => void loadSummary()}>Thử lại</button></div>}
