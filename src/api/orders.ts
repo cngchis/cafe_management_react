@@ -85,6 +85,15 @@ export async function updateEstimate(id: string, input: { customerId: string | n
   if (!response.ok) await readResponse<void>(response);
 }
 
+export async function changeEstimateItemQuantity(id: string, productId: string, quantityDelta: 1 | -1): Promise<void> {
+  const response = await fetch(`/api/orders/${id}/items`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ productId, quantityDelta }),
+  });
+  if (!response.ok) await readResponse<void>(response);
+}
+
 export async function collectOrderCredit(id: string): Promise<number> {
   const response = await fetch(`/api/orders/${id}/collect-credit`, {
     method: "POST",
@@ -101,7 +110,7 @@ export async function getOrders(): Promise<OrderRecord[]> {
 }
 
 export async function getOrder(id: string): Promise<OrderDetailRecord> {
-  const response = await fetch(`/api/orders/${id}`);
+  const response = await fetch(`/api/orders/${id}`, { cache: "no-store" });
   return (await readResponse<{ order: OrderDetailRecord }>(response)).order;
 }
 

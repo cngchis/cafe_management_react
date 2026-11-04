@@ -287,6 +287,62 @@ export const orderRoutes: FastifyPluginAsync = async (app) => {
     return { success: true };
   });
 
+  app.post<{ Params: { id: string }; Body: { productId: string; quantityDelta: 1 | -1 } }>("/orders/:id/items", {
+    schema: {
+      params: { type: "object", required: ["id"], properties: { id: { type: "string", format: "uuid" } } },
+      body: { type: "object", additionalProperties: false, required: ["productId", "quantityDelta"], properties: { productId: { type: "string", format: "uuid" }, quantityDelta: { type: "integer", enum: [-1, 1] } } },
+    },
+  }, async (request, reply) => {
+    const account = await getSessionAccount(request);
+    if (!account) return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lòng đăng nhập." } });
+    await db.transaction(async (tx) => {
+      const [order] = await tx.select({ id: orders.id, orderNumber: orders.orderNumber, status: orders.status, cashierAccountId: orders.cashierAccountId, customerId: orders.customerId, discountVnd: orders.discountVnd })
+        .from(orders).where(eq(orders.id, request.params.id)).for("update").limit(1);
+      if (!order) throw Object.assign(new Error("Không tìm thấy đơn tạm tính."), { statusCode: 404, code: "ORDER_NOT_FOUND" });
+      if (account.role === "cashier" && order.cashierAccountId !== account.id) throw Object.assign(new Error("Bạn không có quyền sửa đơn tạm tính này."), { statusCode: 403, code: "FORBIDDEN" });
+      if (order.status !== "awaiting_payment") throw Object.assign(new Error("Chỉ có thể sửa món trong đơn tạm tính chưa thanh toán."), { statusCode: 409, code: "ORDER_NOT_ESTIMATE" });
+      const [existing] = await tx.select({ id: orderItems.id, quantity: orderItems.quantity, productNameSnapshot: orderItems.productNameSnapshot })
+        .from(orderItems).where(and(eq(orderItems.orderId, order.id), eq(orderItems.productId, request.body.productId))).limit(1);
+      let itemName = existing?.productNameSnapshot ?? "món";
+      if (request.body.quantityDelta < 0) {
+        if (!existing) throw Object.assign(new Error("Món không còn trong đơn tạm tính."), { statusCode: 404, code: "ORDER_ITEM_NOT_FOUND" });
+        if (existing.quantity === 1) await tx.delete(orderItems).where(eq(orderItems.id, existing.id));
+        else await tx.update(orderItems).set({ quantity: existing.quantity - 1 }).where(eq(orderItems.id, existing.id));
+      } else {
+        const [product] = await tx.select({ id: products.id, name: products.name, price: products.salePriceVnd, cost: products.costPriceVnd, isActive: products.isActive }).from(products)
+          .where(eq(products.id, request.body.productId)).for("update").limit(1);
+        if (!product?.isActive) throw Object.assign(new Error("Món không còn khả dụng."), { statusCode: 409, code: "PRODUCT_UNAVAILABLE" });
+        itemName = product.name;
+        if (existing && existing.quantity >= 1000) throw Object.assign(new Error("Số lượng mỗi món tối đa là 1000."), { statusCode: 422, code: "QUANTITY_LIMIT" });
+        let price = product.price;
+        if (order.customerId) {
+          const now = new Date();
+          const [override] = await tx.select({ price: priceListItems.salePriceVnd }).from(priceListItems).innerJoin(priceLists, eq(priceLists.id, priceListItems.priceListId))
+            .leftJoin(priceListCustomers, eq(priceListCustomers.priceListId, priceLists.id))
+            .where(and(eq(priceListItems.productId, product.id), eq(priceLists.isActive, true), lte(priceLists.startsAt, now), or(isNull(priceLists.endsAt), gt(priceLists.endsAt, now)), or(eq(priceLists.appliesToAllCustomers, true), eq(priceListCustomers.customerId, order.customerId))))
+            .orderBy(desc(priceLists.startsAt)).limit(1);
+          if (override) price = override.price;
+        }
+        if (existing) await tx.update(orderItems).set({ quantity: sql`${orderItems.quantity} + 1`, unitPriceVnd: price }).where(eq(orderItems.id, existing.id));
+        else await tx.insert(orderItems).values({ orderId: order.id, productId: product.id, productNameSnapshot: product.name, quantity: 1, unitPriceVnd: price, unitCostVnd: product.cost, discountVnd: 0, lineTotalVnd: price });
+      }
+      const rows = await tx.select({ id: orderItems.id, quantity: orderItems.quantity, unitPriceVnd: orderItems.unitPriceVnd }).from(orderItems).where(eq(orderItems.orderId, order.id));
+      const subtotal = rows.reduce((sum, row) => sum + row.unitPriceVnd * row.quantity, 0);
+      if (!Number.isSafeInteger(subtotal)) throw Object.assign(new Error("Tổng tiền hàng vượt giới hạn hỗ trợ."), { statusCode: 422, code: "INVALID_ORDER_TOTAL" });
+      const discount = Math.min(order.discountVnd, subtotal);
+      let discountRemaining = discount;
+      for (const [index, row] of rows.entries()) {
+        const gross = row.unitPriceVnd * row.quantity;
+        const allocated = index === rows.length - 1 ? discountRemaining : subtotal > 0 ? Math.floor(discount * gross / subtotal) : 0;
+        discountRemaining -= allocated;
+        await tx.update(orderItems).set({ discountVnd: allocated, lineTotalVnd: gross - allocated }).where(eq(orderItems.id, row.id));
+      }
+      await tx.update(orders).set({ subtotalVnd: subtotal, discountVnd: discount, totalVnd: subtotal - discount, updatedAt: new Date() }).where(eq(orders.id, order.id));
+      await tx.insert(auditLogs).values({ accountId: account.id, actorName: account.displayName, action: "updated", entityType: "order", entityId: order.id, summary: request.body.quantityDelta > 0 ? `Thêm ${itemName} vào đơn tạm tính ${order.orderNumber}.` : `Giảm số lượng ${itemName} trong đơn tạm tính ${order.orderNumber}.` });
+    });
+    return { success: true };
+  });
+
   app.post<{ Params: { id: string }; Headers: { "idempotency-key"?: string } }>("/orders/:id/collect-credit", {
     schema: {
       headers: { type: "object", properties: { "idempotency-key": { type: "string", format: "uuid" } } },

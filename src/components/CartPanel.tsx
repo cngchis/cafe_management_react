@@ -5,6 +5,7 @@ import type { CustomerTarget } from "../api/moreOperations";
 import { createCustomer } from "../api/customers";
 import type { BankAccount } from "../api/cashbook";
 import type { OrderDetailRecord } from "../api/orders";
+import { EstimateProductPicker } from "./EstimateProductPicker";
 
 type CartItem = Product & { quantity: number };
 
@@ -26,9 +27,10 @@ type CartPanelProps = {
   onPayEstimate: (id: string, input: { amountReceivedVnd: number; paymentMethod: "cash" | "bank_transfer"; transferReference?: string; bankAccountId?: string }, idempotencyKey: string) => Promise<string>;
   onUpdateEstimate: (id: string, input: { customerId: string | null; note: string }) => Promise<void>;
   onDeleteEstimate: (id: string) => Promise<void>;
+  onChangeEstimateItem: (id: string, productId: string, quantityDelta: 1 | -1) => Promise<void>;
 };
 
-export function CartPanel({ items, customers, customerId, bankAccount, estimate, estimateLoading, estimateError, initialOrderType, onCustomerChange, onCustomerCreated, onUpdateCart, onClearCart, onClose, onComplete, onPayEstimate, onUpdateEstimate, onDeleteEstimate }: CartPanelProps) {
+export function CartPanel({ items, customers, customerId, bankAccount, estimate, estimateLoading, estimateError, initialOrderType, onCustomerChange, onCustomerCreated, onUpdateCart, onClearCart, onClose, onComplete, onPayEstimate, onUpdateEstimate, onDeleteEstimate, onChangeEstimateItem }: CartPanelProps) {
   const [orderType, setOrderType] = useState(initialOrderType);
   const [orderNote, setOrderNote] = useState("");
   const [paid, setPaid] = useState(false);
@@ -52,6 +54,7 @@ export function CartPanel({ items, customers, customerId, bankAccount, estimate,
   const [confirmDeleteEstimate, setConfirmDeleteEstimate] = useState(false);
   const [transferReference, setTransferReference] = useState("");
   const attempt = useRef<{ fingerprint: string; key: string } | null>(null);
+  const estimateTitle = estimate?.orderType === "dine_in" ? estimate.serviceLocation || "Tại bàn" : estimate?.orderType === "delivery" ? "Giao đi" : "Mang về";
   const subtotal = estimate?.subtotalVnd ?? items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const appliedDiscountVnd = estimate?.discountVnd ?? Math.min(discountVnd, subtotal);
   const total = estimate?.totalVnd ?? subtotal - appliedDiscountVnd;
@@ -164,6 +167,13 @@ export function CartPanel({ items, customers, customerId, bankAccount, estimate,
     }
   };
 
+  const updateEstimateQuantity = async (productId: string, quantityDelta: 1 | -1) => {
+    if (!estimate) return;
+    setPaymentError("");
+    try { await onChangeEstimateItem(estimate.id, productId, quantityDelta); }
+    catch (cause) { setPaymentError(cause instanceof Error ? cause.message : "Không thể cập nhật số lượng món."); }
+  };
+
   const applyDiscount = () => {
     const value = Number(discountInput);
     if (!Number.isFinite(value) || value < 0) return;
@@ -188,11 +198,12 @@ export function CartPanel({ items, customers, customerId, bankAccount, estimate,
   };
 
   return <aside id="cart-panel" className="cart-panel" role="dialog" aria-modal="true" aria-label={estimate ? "Thanh toán hóa đơn tạm tính" : "Giỏ hàng"}>
-    <div className="cart-head"><div><h2>{estimate ? "HÓA ĐƠN TẠM TÍNH" : "ĐƠN HIỆN TẠI"}</h2></div><div className="cart-head-actions"><button className="icon-button" disabled={isPaying || Boolean(estimate && estimateLoading)} onClick={() => estimate ? setConfirmDeleteEstimate(true) : onClearCart()} aria-label={estimate ? "Xóa hóa đơn tạm tính" : "Xóa đơn"}><Icon name="trash" size={18} /></button><button className="icon-button" disabled={isPaying} onClick={onClose} aria-label={estimate ? "Quay lại POS" : "Đóng giỏ hàng"}><Icon name="close" size={18} /></button></div></div>
+    <div className="cart-head"><div><h2>{estimate ? `HÓA ĐƠN TẠM TÍNH · ${estimateTitle.toLocaleUpperCase("vi-VN")}` : "ĐƠN HIỆN TẠI"}</h2></div><div className="cart-head-actions"><button className="icon-button" disabled={isPaying || Boolean(estimate && estimateLoading)} onClick={() => estimate ? setConfirmDeleteEstimate(true) : onClearCart()} aria-label={estimate ? "Xóa hóa đơn tạm tính" : "Xóa đơn"}><Icon name="trash" size={18} /></button><button className="icon-button" disabled={isPaying} onClick={onClose} aria-label={estimate ? "Quay lại POS" : "Đóng giỏ hàng"}><Icon name="close" size={18} /></button></div></div>
     <div className="cart-quick-actions">
       <button type="button" disabled={isPaying || isSavingEstimate || (estimate && estimateLoading)} onClick={() => setActiveSheet("customer")}><Icon name="users" size={17} /><span>{(estimate ? estimateCustomer?.name ?? estimate?.customerNameSnapshot : selectedCustomer?.name) ?? "Khách lẻ"}</span></button>
       <button type="button" disabled={isPaying || isSavingEstimate} onClick={() => setActiveSheet("note")}><Icon name="receipt" size={17} /><span>{orderNote ? "Có ghi chú" : "Ghi chú"}</span></button>
     </div>
+    {estimate && <EstimateProductPicker customerId={estimate.customerId ?? undefined} onAdd={(product) => onChangeEstimateItem(estimate.id, product.id, 1)} />}
     {activeSheet && <div className="cart-sheet-layer" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveSheet(null); }}><section className="cart-bottom-sheet" role="dialog" aria-modal="true" aria-label={activeSheet === "customer" ? "Chọn khách hàng" : activeSheet === "createCustomer" ? "Tạo khách hàng" : "Ghi chú đơn hàng"}>
       <div className="cart-sheet-heading"><h3>{activeSheet === "customer" ? "Khách hàng" : activeSheet === "createCustomer" ? "Tạo khách hàng" : "Ghi chú"}</h3><button type="button" className="icon-button" onClick={() => setActiveSheet(null)} aria-label="Đóng"><Icon name="close" size={18} /></button></div>
       {activeSheet === "customer" && <div className="cart-sheet-options"><button type="button" className={!(estimate ? estimate.customerId : customerId) ? "selected" : ""} disabled={isSavingEstimate} onClick={() => estimate ? void saveEstimateDetails(null, orderNote) : (onCustomerChange(""), setActiveSheet(null))}>Khách lẻ · Giá chung</button>{customers.map((customer) => <button type="button" className={customer.id === (estimate ? estimate.customerId : customerId) ? "selected" : ""} disabled={isSavingEstimate} key={customer.id} onClick={() => estimate ? void saveEstimateDetails(customer.id, orderNote) : (onCustomerChange(customer.id), setActiveSheet(null))}>{customer.name}{customer.phone ? ` · ${customer.phone}` : ""}</button>)}{!estimate && <button type="button" className="cart-sheet-create" onClick={() => setActiveSheet("createCustomer")}>+ Tạo khách hàng mới</button>}</div>}
@@ -201,7 +212,7 @@ export function CartPanel({ items, customers, customerId, bankAccount, estimate,
       {paymentError && <p className="payment-error" role="alert">{paymentError}</p>}
     </section></div>}
     <div className="cart-items">
-      {estimateLoading ? <div className="cart-empty" role="status"><strong>Đang tải hóa đơn tạm tính...</strong></div> : estimateError ? <div className="cart-empty" role="alert"><strong>{estimateError}</strong></div> : estimate ? estimate.items.map((item, index) => <div className="cart-item estimate-cart-item" key={`${item.productId ?? item.name}-${index}`}><div className="estimate-cart-item-icon"><Icon name="coffee" /></div><div className="cart-item-main"><div><strong>{item.name}</strong><span>{item.portion || "Phần"}{item.note ? ` · ${item.note}` : ""}</span></div><div className="cart-item-bottom"><b>{formatMoney(item.lineTotalVnd)}</b><span className="estimate-cart-quantity">× {item.quantity}</span></div></div></div>) : items.length ? items.map((item) => <div className="cart-item" key={item.id}><img src={item.image} alt="" /><div className="cart-item-main"><div><strong>{item.name}</strong><span>Size M · Ít đá</span></div><div className="cart-item-bottom"><b>{formatMoney(item.price * item.quantity)}</b><div className="stepper"><button disabled={isPaying} onClick={() => onUpdateCart(item.id, -1)}><Icon name="minus" size={14} /></button><span>{item.quantity}</span><button disabled={isPaying} onClick={() => onUpdateCart(item.id, 1)}><Icon name="plus" size={14} /></button></div></div></div></div>) : <div className="cart-empty"><div><Icon name="coffee" /></div><strong>Đơn hàng trống</strong><span>Chọn món từ thực đơn để bắt đầu</span></div>}
+      {estimateLoading ? <div className="cart-empty" role="status"><strong>Đang tải hóa đơn tạm tính...</strong></div> : estimateError ? <div className="cart-empty" role="alert"><strong>{estimateError}</strong></div> : estimate ? estimate.items.map((item, index) => <div className="cart-item estimate-cart-item" key={`${item.productId ?? item.name}-${index}`}><div className="estimate-cart-item-icon"><Icon name="coffee" /></div><div className="cart-item-main"><div><strong>{item.name}</strong><span>{item.portion || "Phần"}{item.note ? ` · ${item.note}` : ""}</span></div><div className="cart-item-bottom"><b>{formatMoney(item.lineTotalVnd)}</b><div className="stepper estimate-item-stepper"><button type="button" disabled={isPaying || !item.productId} aria-label={`Giảm số lượng ${item.name}`} onClick={() => item.productId && void updateEstimateQuantity(item.productId, -1)}><Icon name="minus" size={14} /></button><span>{item.quantity}</span><button type="button" disabled={isPaying || !item.productId} aria-label={`Tăng số lượng ${item.name}`} onClick={() => item.productId && void updateEstimateQuantity(item.productId, 1)}><Icon name="plus" size={14} /></button></div></div></div></div>) : items.length ? items.map((item) => <div className="cart-item" key={item.id}><img src={item.image} alt="" /><div className="cart-item-main"><div><strong>{item.name}</strong><span>Size M · Ít đá</span></div><div className="cart-item-bottom"><b>{formatMoney(item.price * item.quantity)}</b><div className="stepper"><button disabled={isPaying} onClick={() => onUpdateCart(item.id, -1)}><Icon name="minus" size={14} /></button><span>{item.quantity}</span><button disabled={isPaying} onClick={() => onUpdateCart(item.id, 1)}><Icon name="plus" size={14} /></button></div></div></div></div>) : <div className="cart-empty"><div><Icon name="coffee" /></div><strong>Đơn hàng trống</strong><span>Chọn món từ thực đơn để bắt đầu</span></div>}
     </div>
     <div className="bill">
       <div><span>Tạm tính</span><strong>{formatMoney(subtotal)}</strong></div>

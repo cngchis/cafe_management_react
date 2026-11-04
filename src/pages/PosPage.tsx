@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { Icon } from "../components/Icon";
 import { CartPanel } from "../components/CartPanel";
 import { formatMoney, type Product } from "../data/products";
 import { getProducts } from "../api/products";
-import { cancelOrder, createOrder, deleteEstimate as removeEstimate, getOrder, getOrders, payOrder, updateEstimate, type OrderDetailRecord, type OrderRecord } from "../api/orders";
+import { changeEstimateItemQuantity, cancelOrder, createOrder, deleteEstimate as removeEstimate, getOrder, getOrders, payOrder, updateEstimate, type OrderDetailRecord, type OrderRecord } from "../api/orders";
 import { getPriceListTargets, type CustomerTarget } from "../api/moreOperations";
 import { createCustomer } from "../api/customers";
 import { getBankAccounts, type BankAccount } from "../api/cashbook";
@@ -38,6 +38,7 @@ export function PosPage() {
   const [estimateOrders, setEstimateOrders] = useState<OrderRecord[]>([]);
   const [estimateListLoading, setEstimateListLoading] = useState(false);
   const [estimateListError, setEstimateListError] = useState("");
+  const estimateMutationQueue = useRef<Promise<void>>(Promise.resolve());
   const categories = [
     "Tất cả",
     ...new Set(products.map((product) => product.category).filter(Boolean)),
@@ -83,6 +84,16 @@ export function PosPage() {
       customerNameSnapshot: customers.find((customer) => customer.id === input.customerId)?.name ?? null,
       orderNote: input.note.trim() || null,
     } : current);
+  };
+
+  const changeEstimateItem = async (id: string, productId: string, quantityDelta: 1 | -1) => {
+    const update = estimateMutationQueue.current.then(async () => {
+      await changeEstimateItemQuantity(id, productId, quantityDelta);
+      const latestEstimate = await getOrder(id);
+      setEstimate(latestEstimate);
+    });
+    estimateMutationQueue.current = update.catch(() => undefined);
+    await update;
   };
 
   useEffect(() => {
@@ -143,7 +154,7 @@ export function PosPage() {
     if (!cartOpen) return;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !document.querySelector(".transfer-qr-layer")) {
-        if (estimateId) navigate("/pos");
+        if (estimateId) navigate("/pos/select");
         else setCartOpen(false);
       }
     };
@@ -188,7 +199,7 @@ export function PosPage() {
     {createPortal(<>
       <button className="cart-toggle" aria-label={`Giỏ hàng, ${cartCount} món`} aria-controls="cart-panel" aria-expanded={cartOpen} onClick={() => setCartOpen(true)}><Icon name="cart" size={22} /><b className="cart-count">{cartCount}</b></button>
       {successNotice && <div key={`${successNotice.title}-${successNotice.detail}`} className="pos-success-notice" role="status" aria-live="polite"><span className="pos-success-icon"><Icon name="check" size={22} /></span><span><strong>{successNotice.title}</strong><small>{successNotice.detail}</small></span></div>}
-      {(cartOpen || Boolean(estimateId)) && <div className="cart-overlay">{!estimateId && <button className="cart-backdrop" type="button" aria-label="Đóng giỏ hàng" onClick={() => setCartOpen(false)} />}<CartPanel items={estimateId ? [] : cartItems} customers={customers} customerId={customerId} bankAccount={defaultBankAccount} estimate={estimate} estimateLoading={estimateLoading} estimateError={estimateError} initialOrderType={initialOrderType} onCustomerChange={setCustomerId} onCustomerCreated={(customer) => setCustomers((current) => [...current, customer].sort((a, b) => a.name.localeCompare(b.name, "vi")))} onUpdateCart={updateCart} onClearCart={() => setCart({})} onClose={() => { if (estimateId) { setCartOpen(false); navigate("/pos"); } else setCartOpen(false); }} onComplete={completeOrder} onPayEstimate={settleEstimate} onUpdateEstimate={saveEstimateDetails} onDeleteEstimate={deleteEstimate} /></div>}
+      {(cartOpen || Boolean(estimateId)) && <div className="cart-overlay">{!estimateId && <button className="cart-backdrop" type="button" aria-label="Đóng giỏ hàng" onClick={() => setCartOpen(false)} />}<CartPanel items={estimateId ? [] : cartItems} customers={customers} customerId={customerId} bankAccount={defaultBankAccount} estimate={estimate} estimateLoading={estimateLoading} estimateError={estimateError} initialOrderType={initialOrderType} onCustomerChange={setCustomerId} onCustomerCreated={(customer) => setCustomers((current) => [...current, customer].sort((a, b) => a.name.localeCompare(b.name, "vi")))} onUpdateCart={updateCart} onClearCart={() => setCart({})} onClose={() => { if (estimateId) { setCartOpen(false); navigate("/pos/select"); } else setCartOpen(false); }} onComplete={completeOrder} onPayEstimate={settleEstimate} onUpdateEstimate={saveEstimateDetails} onDeleteEstimate={deleteEstimate} onChangeEstimateItem={changeEstimateItem} /></div>}
     </>, document.body)}
   </div>;
 }

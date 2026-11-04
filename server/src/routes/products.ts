@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { and, desc, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, ilike, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { getSessionAccount } from "../auth/session.js";
 import { auditLogs, inventoryMovements, priceListCustomers, priceListItems, priceLists, products } from "../db/schema.js";
@@ -44,7 +44,9 @@ function publicProduct(product: {
 }
 
 export const productRoutes: FastifyPluginAsync = async (app) => {
-  app.get<{ Querystring: { customerId?: string } }>("/products", async (request, reply) => {
+  app.get<{ Querystring: { customerId?: string; search?: string; offset?: string; limit?: string } }>("/products", {
+    schema: { querystring: { type: "object", properties: { customerId: { type: "string", format: "uuid" }, search: { type: "string", maxLength: 100 }, offset: { type: "string", pattern: "^\\d+$" }, limit: { type: "string", pattern: "^\\d+$" } } } },
+  }, async (request, reply) => {
     if (!(await getSessionAccount(request))) {
       return reply.code(401).send({ error: { code: "UNAUTHENTICATED", message: "Vui lòng đăng nhập." } });
     }
@@ -60,6 +62,8 @@ export const productRoutes: FastifyPluginAsync = async (app) => {
     const priceByProduct = new Map<string, number>();
     for (const override of priceOverrides) if (!priceByProduct.has(override.productId)) priceByProduct.set(override.productId, override.salePriceVnd);
 
+    const offset = Math.max(0, Number(request.query.offset) || 0);
+    const limit = request.query.limit === undefined ? 10000 : Math.min(50, Math.max(1, Number(request.query.limit) || 8));
     const rows = await db
       .select({
         id: products.id,
@@ -75,11 +79,13 @@ export const productRoutes: FastifyPluginAsync = async (app) => {
       })
       .from(products)
       .leftJoin(inventoryMovements, eq(inventoryMovements.productId, products.id))
-      .where(eq(products.isActive, true))
+      .where(and(eq(products.isActive, true), ...(request.query.search?.trim() ? [or(ilike(products.name, `%${request.query.search.trim()}%`), ilike(products.sku, `%${request.query.search.trim()}%`))!] : [])))
       .groupBy(products.id)
-      .orderBy(products.name);
+      .orderBy(products.name)
+      .limit(limit + 1)
+      .offset(offset);
 
-    return { products: rows.map((row) => publicProduct({ ...row, price: priceByProduct.get(row.id) ?? row.price })) };
+    return { products: rows.slice(0, limit).map((row) => publicProduct({ ...row, price: priceByProduct.get(row.id) ?? row.price })), hasMore: rows.length > limit };
   });
 
   app.post<{
