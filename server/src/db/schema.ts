@@ -228,6 +228,7 @@ export const orderItems = pgTable(
     index("order_items_order_id_idx").on(table.orderId),
     index("order_items_product_id_idx").on(table.productId).where(sql`${table.productId} IS NOT NULL`),
     check("order_items_unit_cost_nonnegative", sql`${table.unitCostVnd} >= 0`),
+    check("order_items_total_matches_components", sql`${table.lineTotalVnd} = ${table.quantity}::bigint * ${table.unitPriceVnd} - ${table.discountVnd}`),
   ],
 );
 
